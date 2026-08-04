@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e3a5f">
+<title>HourTrack — FLL Time Log</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%231e3a5f%22/><text x=%2250%22 y=%2268%22 font-size=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>H</text></svg>">
+<style>
+  :root{
+    --bg:#0f172a; --panel:#16213a; --panel2:#1c2942; --border:#2a3a5c;
+    --accent:#4f8ef7; --accent2:#3ddc97; --text:#e6ecf7; --muted:#8fa1c0;
+    --danger:#ef5b6b; --warn:#f5b93d;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);padding-bottom:60px;}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#16213a,#16213aee);
+    backdrop-filter:blur(6px);border-bottom:1px solid var(--border);padding:14px 16px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  header h1{font-size:17px;margin:0;display:flex;align-items:center;gap:8px;}
+  header h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--accent2);}
+  #status{font-size:11px;color:var(--muted);}
+  main{max-width:900px;margin:0 auto;padding:16px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;}
+  form{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  form .full{grid-column:1/-1;}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--border);
+    color:var(--text);padding:9px 10px;border-radius:8px;font-size:14px;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:36px;}
+  .btn{cursor:pointer;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;}
+  .btn-primary{background:var(--accent);color:#08122a;}
+  .btn-secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .row-actions{display:flex;gap:6px;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .filters select,.filters input{width:auto;min-width:110px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;cursor:pointer;user-select:none;}
+  tbody tr:hover{background:var(--panel2);}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#22314f;font-size:11px;color:var(--accent);}
+  .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:13px;}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:10px;}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+  .stat .val{font-size:20px;font-weight:700;}
+  .stat .lbl{font-size:11px;color:var(--muted);}
+  .subtable{margin-top:10px;}
+  .actions-row{display:flex;gap:8px;flex-wrap:wrap;}
+  #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    background:var(--panel2);border:1px solid var(--border);padding:10px 16px;border-radius:8px;
+    font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;}
+  #toast.show{opacity:1;}
+  @media(max-width:520px){form{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="dot"></span> HourTrack</h1>
+  <div id="status">Loading…</div>
+</header>
+
+<main>
+
+  <div class="card">
+    <h2>Log Time</h2>
+    <form id="entryForm">
+      <div>
+        <label for="fName">Name</label>
+        <input list="nameList" id="fName" required placeholder="e.g. Caden">
+        <datalist id="nameList"></datalist>
+      </div>
+      <div>
+        <label for="fDate">Date</label>
+        <input type="date" id="fDate" required>
+      </div>
+      <div>
+        <label for="fActivity">Activity</label>
+        <select id="fActivity" required>
+          <option value="Robot design">Robot design</option>
+          <option value="Programming">Programming</option>
+          <option value="Building">Building</option>
+          <option value="Core Values">Core Values</option>
+          <option value="Research">Research</option>
+          <option value="Documentation">Documentation</option>
+          <option value="Strategy / Missions">Strategy / Missions</option>
+          <option value="Testing / Driving practice">Testing / Driving practice</option>
+          <option value="Competition">Competition</option>
+          <option value="Outreach">Outreach</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="fDuration">Duration (hours)</label>
+        <input type="number" id="fDuration" step="0.25" min="0" required placeholder="1.5">
+      </div>
+      <div>
+        <label for="fWeek">Week</label>
+        <input type="number" id="fWeek" min="1" required placeholder="1">
+      </div>
+      <div class="full">
+        <label for="fComments">Comments (optional)</label>
+        <textarea id="fComments" placeholder="class, home practice, etc."></textarea>
+      </div>
+      <div class="full">
+        <button type="submit" class="btn btn-primary" id="submitBtn">Add Entry</button>
+        <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Summary</h2>
+    <div class="stats-grid" id="statsGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Entries</h2>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="exportXlsxBtn">Export .xlsx</button>
+        <button class="btn btn-secondary btn-sm" id="exportCsvBtn">Export .csv</button>
+        <button class="btn btn-danger btn-sm" id="clearAllBtn">Clear All</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="filterWeek"><option value="">All weeks</option></select>
+        <select id="filterActivity"><option value="">All activities</option></select>
+        <input type="text" id="filterName" placeholder="Filter name…">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="name">Name</th>
+          <th data-sort="date">Date</th>
+          <th data-sort="activity">Activity</th>
+          <th data-sort="duration">Hours</th>
+          <th data-sort="comments">Comments</th>
+          <th data-sort="week">Week</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="entriesBody"></tbody>
+    </table>
+    </div>
+    <div class="empty" id="emptyMsg" style="display:none;">No entries yet — add your first one above.</div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
