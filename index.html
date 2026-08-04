@@ -76,12 +76,16 @@
 
   .summary-sub{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
   .summary-sub h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;}
-  .barrow{display:grid;grid-template-columns:70px 1fr 50px;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;}
+  .barrow{display:grid;grid-template-columns:70px 1fr 50px;align-items:center;gap:8px;margin-bottom:2px;font-size:13px;}
   .bartrack{background:var(--panel2);border-radius:6px;height:14px;overflow:hidden;}
   .barfill{background:var(--accent);height:100%;border-radius:6px;}
+  .barfill-stack{display:flex;height:100%;}
+  .barfill-stack span{display:block;height:100%;}
   .barval{text-align:right;color:var(--muted);font-size:12px;}
+  .barbreakdown{font-size:11px;color:var(--muted);margin:0 0 10px 78px;}
   .pie-flex{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
   .legend{display:flex;flex-direction:column;gap:6px;font-size:13px;}
+  .legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px;}
   .legend-item{display:flex;align-items:center;gap:8px;}
   .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;}
   table.weeklytable{font-size:12px;}
@@ -143,6 +147,11 @@
         <button class="btn btn-secondary btn-sm" id="addRowBtn">Add Row</button>
       </div>
 
+      <div style="margin-top:12px;">
+        <label for="mComments">Comments (optional — applied to every entry in this save, on top of any row comment)</label>
+        <textarea id="mComments" placeholder="e.g. class, home practice, competition day"></textarea>
+      </div>
+
       <div class="actions-row" style="margin-top:14px;">
         <button class="btn btn-primary" id="commitMatrixBtn">Add Entries</button>
         <button class="btn btn-secondary" id="clearMatrixBtn">Clear Hours</button>
@@ -195,6 +204,7 @@
 
     <div class="summary-sub">
       <h3>Hours by Member</h3>
+      <div class="legend-row" id="memberLegend"></div>
       <div id="memberBars"></div>
     </div>
 
@@ -206,6 +216,8 @@
     <div class="summary-sub">
       <h3>Weekly Hours vs Target</h3>
       <div id="weeklyChart"></div>
+      <h3 style="margin-top:18px;">Cumulative Hours vs Target</h3>
+      <div id="cumulativeChart"></div>
       <div style="overflow-x:auto;margin-top:10px;">
         <table class="entries weeklytable">
           <thead>

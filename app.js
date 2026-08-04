@@ -64,6 +64,7 @@ const statusEl = document.getElementById('status');
 // ---------- Elements: matrix ----------
 const mDate = document.getElementById('mDate');
 const mWeek = document.getElementById('mWeek');
+const mComments = document.getElementById('mComments');
 const matrixBody = document.getElementById('matrixBody');
 const newRowName = document.getElementById('newRowName');
 const addRowBtn = document.getElementById('addRowBtn');
@@ -72,8 +73,10 @@ const clearMatrixBtn = document.getElementById('clearMatrixBtn');
 
 // ---------- Elements: summary ----------
 const memberBars = document.getElementById('memberBars');
+const memberLegend = document.getElementById('memberLegend');
 const activityPie = document.getElementById('activityPie');
 const weeklyChart = document.getElementById('weeklyChart');
+const cumulativeChart = document.getElementById('cumulativeChart');
 const cumulativeBody = document.getElementById('cumulativeBody');
 
 // defaults
@@ -159,13 +162,16 @@ clearMatrixBtn.addEventListener('click', () => {
 commitMatrixBtn.addEventListener('click', () => {
   const date = mDate.value;
   const week = computeWeek(date);
+  const overallComment = mComments.value.trim();
 
   if (!date) { toast('Pick a date first'); return; }
 
   const newEntries = [];
   matrixBody.querySelectorAll('tr').forEach(tr => {
     const name = tr.dataset.name;
-    const comments = tr.querySelector('input.commentcell').value.trim();
+    const rowComment = tr.querySelector('input.commentcell').value.trim();
+    const comments = rowComment && overallComment ? `${rowComment} | ${overallComment}`
+                      : (rowComment || overallComment);
     tr.querySelectorAll('input.hourcell').forEach(inp => {
       const val = parseFloat(inp.value);
       if (!isNaN(val) && val > 0) {
@@ -188,6 +194,7 @@ commitMatrixBtn.addEventListener('click', () => {
   saveEntries(entries);
   matrixBody.querySelectorAll('input.hourcell').forEach(inp => inp.value = '');
   matrixBody.querySelectorAll('input.commentcell').forEach(inp => inp.value = '');
+  mComments.value = '';
   render();
   toast(`Added ${newEntries.length} entr${newEntries.length === 1 ? 'y' : 'ies'}`);
 });
@@ -250,18 +257,37 @@ function render() {
 }
 
 function renderMemberBars(rows) {
+  memberLegend.innerHTML = ACTIVITIES.map(a =>
+    `<span class="legend-item"><span class="swatch" style="background:${ACTIVITY_COLORS[a]}"></span>${a}</span>`
+  ).join('');
+
   const byPerson = {};
-  rows.forEach(e => { byPerson[e.name] = (byPerson[e.name] || 0) + Number(e.duration); });
-  const entries2 = Object.entries(byPerson).sort((a, b) => b[1] - a[1]);
-  if (!entries2.length) { memberBars.innerHTML = '<div class="empty">No data yet</div>'; return; }
-  const max = Math.max(...entries2.map(([, h]) => h));
-  memberBars.innerHTML = entries2.map(([name, h]) => `
-    <div class="barrow">
-      <div>${escapeHtml(name)}</div>
-      <div class="bartrack"><div class="barfill" style="width:${max > 0 ? (h / max * 100).toFixed(1) : 0}%"></div></div>
-      <div class="barval">${h.toFixed(1)}h</div>
-    </div>
-  `).join('');
+  rows.forEach(e => {
+    if (!byPerson[e.name]) byPerson[e.name] = { Robot: 0, Project: 0, Community: 0, total: 0 };
+    byPerson[e.name][e.activity] = (byPerson[e.name][e.activity] || 0) + Number(e.duration);
+    byPerson[e.name].total += Number(e.duration);
+  });
+  const list = Object.entries(byPerson).sort((a, b) => b[1].total - a[1].total);
+  if (!list.length) { memberBars.innerHTML = '<div class="empty">No data yet</div>'; return; }
+  const max = Math.max(...list.map(([, v]) => v.total));
+
+  memberBars.innerHTML = list.map(([name, v]) => {
+    const outerWidth = max > 0 ? (v.total / max * 100) : 0;
+    const segments = ACTIVITIES.map(a => {
+      if (v[a] <= 0) return '';
+      const segWidth = v.total > 0 ? (v[a] / v.total * 100) : 0;
+      return `<span style="width:${segWidth}%;background:${ACTIVITY_COLORS[a]};" title="${a}: ${v[a].toFixed(1)}h"></span>`;
+    }).join('');
+    const breakdown = ACTIVITIES.filter(a => v[a] > 0).map(a => `${a} ${v[a].toFixed(1)}h`).join(' · ');
+    return `
+      <div class="barrow">
+        <div>${escapeHtml(name)}</div>
+        <div class="bartrack"><div class="barfill-stack" style="width:${outerWidth}%;">${segments}</div></div>
+        <div class="barval">${v.total.toFixed(1)}h</div>
+      </div>
+      <div class="barbreakdown">${escapeHtml(breakdown)}</div>
+    `;
+  }).join('');
 }
 
 const ACTIVITY_COLORS = { Robot: '#4f8ef7', Project: '#3ddc97', Community: '#f5b93d' };
@@ -299,10 +325,12 @@ function renderWeeklyChart(rows) {
 
   if (!weeks.length) {
     weeklyChart.innerHTML = '<div class="empty">No data yet</div>';
+    cumulativeChart.innerHTML = '';
     cumulativeBody.innerHTML = '';
     return;
   }
 
+  // ---- weekly bar chart ----
   const maxVal = Math.max(target, ...weeks.map(w => byWeek[w]));
   const barW = 34, gap = 16, chartH = 150, topPad = 16, bottomPad = 20;
   const chartW = weeks.length * (barW + gap) + gap;
@@ -329,12 +357,60 @@ function renderWeeklyChart(rows) {
       ${bars}
     </svg>`;
 
+  // ---- cumulative actual vs target (one pass) ----
   let cumActual = 0, cumTarget = 0;
-  cumulativeBody.innerHTML = weeks.map(w => {
+  const cumActualArr = [], cumTargetArr = [];
+  weeks.forEach(w => {
+    cumActual += byWeek[w];
+    cumTarget += target;
+    cumActualArr.push(cumActual);
+    cumTargetArr.push(cumTarget);
+  });
+
+  const maxCum = Math.max(...cumActualArr, ...cumTargetArr, 1);
+  const chartW2 = Math.max(320, weeks.length * 40);
+  const chartH2 = 200, padL = 40, padR = 10, padT = 14, padB = 46;
+  const plotW = chartW2 - padL - padR;
+  const plotH = chartH2 - padT - padB;
+  const xStep = weeks.length > 1 ? plotW / (weeks.length - 1) : 0;
+  const xPos = i => padL + i * xStep;
+  const yPos = v => padT + plotH - (v / maxCum) * plotH;
+
+  const targetPoints = cumTargetArr.map((v, i) => `${xPos(i)},${yPos(v)}`).join(' ');
+  const actualPoints = cumActualArr.map((v, i) => `${xPos(i)},${yPos(v)}`).join(' ');
+  const targetDots = cumTargetArr.map((v, i) => `<circle cx="${xPos(i)}" cy="${yPos(v)}" r="3.5" fill="var(--accent)"></circle>`).join('');
+  const actualDots = cumActualArr.map((v, i) => `<circle cx="${xPos(i)}" cy="${yPos(v)}" r="3.5" fill="var(--danger)"></circle>`).join('');
+  const xLabels = weeks.map((w, i) =>
+    `<text x="${xPos(i)}" y="${padT + plotH + 14}" font-size="9" fill="var(--muted)" text-anchor="end" transform="rotate(-40 ${xPos(i)} ${padT + plotH + 14})">W${w}</text>`
+  ).join('');
+
+  const ticks = 4;
+  let gridLines = '';
+  for (let t = 0; t <= ticks; t++) {
+    const val = maxCum / ticks * t;
+    const y = yPos(val);
+    gridLines += `<line x1="${padL}" y1="${y}" x2="${padL + plotW}" y2="${y}" stroke="var(--border)" stroke-width="1"></line>
+      <text x="${padL - 6}" y="${y + 3}" font-size="9" fill="var(--muted)" text-anchor="end">${Math.round(val)}</text>`;
+  }
+
+  cumulativeChart.innerHTML = `
+    <div class="legend-row">
+      <span class="legend-item"><span class="swatch" style="background:var(--accent)"></span>Cumulative Target</span>
+      <span class="legend-item"><span class="swatch" style="background:var(--danger)"></span>Cumulative Actual</span>
+    </div>
+    <svg viewBox="0 0 ${chartW2} ${chartH2}" style="width:100%;height:${chartH2}px;">
+      ${gridLines}
+      <polyline points="${targetPoints}" fill="none" stroke="var(--accent)" stroke-width="2"></polyline>
+      <polyline points="${actualPoints}" fill="none" stroke="var(--danger)" stroke-width="2"></polyline>
+      ${targetDots}${actualDots}
+      ${xLabels}
+    </svg>`;
+
+  // ---- table ----
+  cumulativeBody.innerHTML = weeks.map((w, i) => {
     const val = byWeek[w];
-    cumActual += val; cumTarget += target;
     const diff = val - target;
-    const cumDiff = cumActual - cumTarget;
+    const cumDiff = cumActualArr[i] - cumTargetArr[i];
     const diffColor = diff >= 0 ? 'var(--accent2)' : 'var(--danger)';
     const cumColor = cumDiff >= 0 ? 'var(--accent2)' : 'var(--danger)';
     return `<tr>
@@ -342,8 +418,8 @@ function renderWeeklyChart(rows) {
       <td>${val.toFixed(1)}h</td>
       <td>${target}h</td>
       <td style="color:${diffColor}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}h</td>
-      <td>${cumActual.toFixed(1)}h</td>
-      <td>${cumTarget.toFixed(1)}h</td>
+      <td>${cumActualArr[i].toFixed(1)}h</td>
+      <td>${cumTargetArr[i].toFixed(1)}h</td>
       <td style="color:${cumColor}">${cumDiff >= 0 ? '+' : ''}${cumDiff.toFixed(1)}h</td>
     </tr>`;
   }).join('');
