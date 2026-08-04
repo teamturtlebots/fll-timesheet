@@ -58,16 +58,6 @@
   .addrow-bar{display:flex;gap:8px;margin-top:10px;}
   .addrow-bar input{flex:1;}
 
-  /* Image assist */
-  #imgDropZone{border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;
-    color:var(--muted);font-size:13px;cursor:pointer;}
-  #imgDropZone:hover{border-color:var(--accent);}
-  #imgPreviewWrap{display:none;margin-top:12px;}
-  #imgPreviewWrap img{max-width:100%;max-height:420px;border-radius:8px;border:1px solid var(--border);
-    cursor:zoom-in;display:block;margin:0 auto;}
-  #imgZoomOverlay{display:none;position:fixed;inset:0;background:#000c;z-index:100;
-    align-items:center;justify-content:center;padding:20px;cursor:zoom-out;}
-  #imgZoomOverlay img{max-width:95%;max-height:95%;border-radius:8px;}
   .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
 
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px;}
@@ -83,6 +73,19 @@
   .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
   .stat .val{font-size:20px;font-weight:700;}
   .stat .lbl{font-size:11px;color:var(--muted);}
+
+  .summary-sub{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+  .summary-sub h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;}
+  .barrow{display:grid;grid-template-columns:70px 1fr 50px;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;}
+  .bartrack{background:var(--panel2);border-radius:6px;height:14px;overflow:hidden;}
+  .barfill{background:var(--accent);height:100%;border-radius:6px;}
+  .barval{text-align:right;color:var(--muted);font-size:12px;}
+  .pie-flex{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+  .legend{display:flex;flex-direction:column;gap:6px;font-size:13px;}
+  .legend-item{display:flex;align-items:center;gap:8px;}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  table.weeklytable{font-size:12px;}
+  table.weeklytable th,table.weeklytable td{padding:6px 8px;}
   .actions-row{display:flex;gap:8px;flex-wrap:wrap;}
   #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
     background:var(--panel2);border:1px solid var(--border);padding:10px 16px;border-radius:8px;
@@ -104,7 +107,6 @@
     <h2>Log Time</h2>
     <div class="tabs">
       <div class="tab active" data-tab="matrix">Matrix Entry</div>
-      <div class="tab" data-tab="image">From Photo</div>
       <div class="tab" data-tab="single">Single Entry</div>
     </div>
 
@@ -116,12 +118,8 @@
           <input type="date" id="mDate">
         </div>
         <div>
-          <label for="mWeek">Week (applies to whole save)</label>
-          <input type="number" id="mWeek" min="1">
-        </div>
-        <div class="full">
-          <label for="mComments">Comments (optional, applies to whole save)</label>
-          <textarea id="mComments" placeholder="class, home practice, etc."></textarea>
+          <label for="mWeek">Week (auto-calculated)</label>
+          <input type="text" id="mWeek" readonly>
         </div>
       </div>
 
@@ -133,6 +131,7 @@
               <th>Robot</th>
               <th>Project</th>
               <th>Community</th>
+              <th style="text-align:left;">Comments</th>
               <th></th>
             </tr>
           </thead>
@@ -148,23 +147,6 @@
         <button class="btn btn-primary" id="commitMatrixBtn">Add Entries</button>
         <button class="btn btn-secondary" id="clearMatrixBtn">Clear Hours</button>
       </div>
-    </div>
-
-    <!-- IMAGE TAB -->
-    <div class="tabpanel" id="tab-image">
-      <div id="imgDropZone">
-        📷 Tap to upload a photo of your hours sheet<br>
-        <span style="font-size:11px;">It'll appear below so you can copy the numbers into the matrix.</span>
-      </div>
-      <input type="file" id="imgInput" accept="image/*" style="display:none;">
-      <div id="imgPreviewWrap">
-        <img id="imgPreview" alt="Uploaded sheet">
-      </div>
-      <p class="hint">
-        This app can't auto-read handwriting (that needs an AI vision service with an API key, which isn't safe
-        to embed in a public site). Instead: upload the photo, then switch to <b>Matrix Entry</b> — the image stays
-        visible here so you can flip back and forth while you type the numbers in.
-      </p>
     </div>
 
     <!-- SINGLE ENTRY TAB -->
@@ -192,8 +174,8 @@
           <input type="number" id="fDuration" step="0.25" min="0" required placeholder="1.5">
         </div>
         <div>
-          <label for="fWeek">Week</label>
-          <input type="number" id="fWeek" min="1" required placeholder="1">
+          <label for="fWeek">Week (auto-calculated)</label>
+          <input type="text" id="fWeek" readonly>
         </div>
         <div class="full" style="grid-column:1/-1;">
           <label for="fComments">Comments (optional)</label>
@@ -210,6 +192,32 @@
   <div class="card">
     <h2>Summary</h2>
     <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="summary-sub">
+      <h3>Hours by Member</h3>
+      <div id="memberBars"></div>
+    </div>
+
+    <div class="summary-sub">
+      <h3>Hours by Activity</h3>
+      <div id="activityPie"></div>
+    </div>
+
+    <div class="summary-sub">
+      <h3>Weekly Hours vs Target</h3>
+      <div id="weeklyChart"></div>
+      <div style="overflow-x:auto;margin-top:10px;">
+        <table class="entries weeklytable">
+          <thead>
+            <tr>
+              <th>Week</th><th>Actual</th><th>Target</th><th>Diff</th>
+              <th>Cum. Actual</th><th>Cum. Target</th><th>Cum. Diff</th>
+            </tr>
+          </thead>
+          <tbody id="cumulativeBody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -249,7 +257,6 @@
 
 </main>
 
-<div id="imgZoomOverlay"><img id="imgZoomImg" alt="Zoomed sheet"></div>
 <div id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

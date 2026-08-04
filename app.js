@@ -3,6 +3,15 @@ const STORAGE_KEY = 'hourtrack_entries_v1';
 const ROSTER_KEY = 'hourtrack_roster_v1';
 const DEFAULT_ROSTER = ['Evan', 'Mason', 'Ellen', 'Eric', 'Stanley', 'Anya', 'Aiden'];
 const ACTIVITIES = ['Robot', 'Project', 'Community'];
+const SEASON_START = new Date('2026-07-20T00:00:00'); // Week 1 = 7/20–7/26
+
+function computeWeek(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  const diffDays = Math.floor((d - SEASON_START) / 86400000);
+  const week = Math.floor(diffDays / 7) + 1;
+  return week < 1 ? 1 : week;
+}
 
 function loadEntries() {
   try {
@@ -55,25 +64,30 @@ const statusEl = document.getElementById('status');
 // ---------- Elements: matrix ----------
 const mDate = document.getElementById('mDate');
 const mWeek = document.getElementById('mWeek');
-const mComments = document.getElementById('mComments');
 const matrixBody = document.getElementById('matrixBody');
 const newRowName = document.getElementById('newRowName');
 const addRowBtn = document.getElementById('addRowBtn');
 const commitMatrixBtn = document.getElementById('commitMatrixBtn');
 const clearMatrixBtn = document.getElementById('clearMatrixBtn');
 
-// ---------- Elements: image tab ----------
-const imgDropZone = document.getElementById('imgDropZone');
-const imgInput = document.getElementById('imgInput');
-const imgPreviewWrap = document.getElementById('imgPreviewWrap');
-const imgPreview = document.getElementById('imgPreview');
-const imgZoomOverlay = document.getElementById('imgZoomOverlay');
-const imgZoomImg = document.getElementById('imgZoomImg');
+// ---------- Elements: summary ----------
+const memberBars = document.getElementById('memberBars');
+const activityPie = document.getElementById('activityPie');
+const weeklyChart = document.getElementById('weeklyChart');
+const cumulativeBody = document.getElementById('cumulativeBody');
 
 // defaults
 const todayStr = new Date().toISOString().slice(0, 10);
 fDate.value = todayStr;
 mDate.value = todayStr;
+
+function refreshWeekDisplays() {
+  fWeek.value = computeWeek(fDate.value);
+  mWeek.value = computeWeek(mDate.value);
+}
+fDate.addEventListener('input', refreshWeekDisplays);
+mDate.addEventListener('input', refreshWeekDisplays);
+refreshWeekDisplays();
 
 // ---------- Helpers ----------
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -114,6 +128,7 @@ function renderMatrix() {
     <tr data-name="${escapeHtml(name)}">
       <td class="namecell">${escapeHtml(name)}</td>
       ${ACTIVITIES.map(a => `<td><input type="number" class="hourcell" step="0.25" min="0" data-activity="${a}" placeholder="0"></td>`).join('')}
+      <td><input type="text" class="commentcell" placeholder="optional"></td>
       <td class="rmcell"><button class="btn btn-danger btn-sm" onclick="removeRosterRow('${escapeHtml(name)}')">✕</button></td>
     </tr>
   `).join('');
@@ -143,15 +158,14 @@ clearMatrixBtn.addEventListener('click', () => {
 
 commitMatrixBtn.addEventListener('click', () => {
   const date = mDate.value;
-  const week = parseInt(mWeek.value, 10);
-  const comments = mComments.value.trim();
+  const week = computeWeek(date);
 
   if (!date) { toast('Pick a date first'); return; }
-  if (isNaN(week)) { toast('Enter a week number'); return; }
 
   const newEntries = [];
   matrixBody.querySelectorAll('tr').forEach(tr => {
     const name = tr.dataset.name;
+    const comments = tr.querySelector('input.commentcell').value.trim();
     tr.querySelectorAll('input.hourcell').forEach(inp => {
       const val = parseFloat(inp.value);
       if (!isNaN(val) && val > 0) {
@@ -173,26 +187,10 @@ commitMatrixBtn.addEventListener('click', () => {
   entries.push(...newEntries);
   saveEntries(entries);
   matrixBody.querySelectorAll('input.hourcell').forEach(inp => inp.value = '');
-  mComments.value = '';
+  matrixBody.querySelectorAll('input.commentcell').forEach(inp => inp.value = '');
   render();
   toast(`Added ${newEntries.length} entr${newEntries.length === 1 ? 'y' : 'ies'}`);
 });
-
-// ---------- Image tab ----------
-imgDropZone.addEventListener('click', () => imgInput.click());
-imgInput.addEventListener('change', () => {
-  const file = imgInput.files[0];
-  if (!file) return;
-  const url = URL.createObjectURL(file);
-  imgPreview.src = url;
-  imgPreviewWrap.style.display = 'block';
-  toast('Photo loaded — switch to Matrix Entry to transcribe it');
-});
-imgPreview.addEventListener('click', () => {
-  imgZoomImg.src = imgPreview.src;
-  imgZoomOverlay.style.display = 'flex';
-});
-imgZoomOverlay.addEventListener('click', () => { imgZoomOverlay.style.display = 'none'; });
 
 // ---------- Render entries table ----------
 function render() {
@@ -244,8 +242,111 @@ function render() {
   `).join('');
 
   emptyMsg.style.display = rows.length === 0 ? 'block' : 'none';
-  renderStats(rows.length ? rows : entries);
+  renderStats(entries);
+  renderMemberBars(entries);
+  renderActivityPie(entries);
+  renderWeeklyChart(entries);
   statusEl.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · stored offline`;
+}
+
+function renderMemberBars(rows) {
+  const byPerson = {};
+  rows.forEach(e => { byPerson[e.name] = (byPerson[e.name] || 0) + Number(e.duration); });
+  const entries2 = Object.entries(byPerson).sort((a, b) => b[1] - a[1]);
+  if (!entries2.length) { memberBars.innerHTML = '<div class="empty">No data yet</div>'; return; }
+  const max = Math.max(...entries2.map(([, h]) => h));
+  memberBars.innerHTML = entries2.map(([name, h]) => `
+    <div class="barrow">
+      <div>${escapeHtml(name)}</div>
+      <div class="bartrack"><div class="barfill" style="width:${max > 0 ? (h / max * 100).toFixed(1) : 0}%"></div></div>
+      <div class="barval">${h.toFixed(1)}h</div>
+    </div>
+  `).join('');
+}
+
+const ACTIVITY_COLORS = { Robot: '#4f8ef7', Project: '#3ddc97', Community: '#f5b93d' };
+
+function renderActivityPie(rows) {
+  const totals = {}; ACTIVITIES.forEach(a => totals[a] = 0);
+  rows.forEach(e => { totals[e.activity] = (totals[e.activity] || 0) + Number(e.duration); });
+  const total = Object.values(totals).reduce((a, b) => a + b, 0);
+
+  if (total === 0) { activityPie.innerHTML = '<div class="empty">No data yet</div>'; return; }
+
+  const r = 60, circ = 2 * Math.PI * r;
+  let offset = 0;
+  let circles = '';
+  Object.entries(totals).forEach(([act, val]) => {
+    if (val <= 0) return;
+    const frac = val / total;
+    const dash = frac * circ;
+    circles += `<circle r="${r}" cx="90" cy="90" fill="transparent" stroke="${ACTIVITY_COLORS[act]}" stroke-width="26" stroke-dasharray="${dash} ${circ - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 90 90)"></circle>`;
+    offset += dash;
+  });
+  const svg = `<svg viewBox="0 0 180 180" width="180" height="180">${circles}</svg>`;
+  const legend = Object.entries(totals).map(([act, val]) => {
+    const pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+    return `<div class="legend-item"><span class="swatch" style="background:${ACTIVITY_COLORS[act]}"></span>${act}: ${val.toFixed(1)}h (${pct}%)</div>`;
+  }).join('');
+  activityPie.innerHTML = `<div class="pie-flex">${svg}<div class="legend">${legend}</div></div>`;
+}
+
+function renderWeeklyChart(rows) {
+  const target = 8 * roster.length; // 8 hrs/kid/week
+  const byWeek = {};
+  rows.forEach(e => { byWeek[e.week] = (byWeek[e.week] || 0) + Number(e.duration); });
+  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
+
+  if (!weeks.length) {
+    weeklyChart.innerHTML = '<div class="empty">No data yet</div>';
+    cumulativeBody.innerHTML = '';
+    return;
+  }
+
+  const maxVal = Math.max(target, ...weeks.map(w => byWeek[w]));
+  const barW = 34, gap = 16, chartH = 150, topPad = 16, bottomPad = 20;
+  const chartW = weeks.length * (barW + gap) + gap;
+  const scale = v => (v / maxVal) * chartH;
+  const targetY = topPad + chartH - scale(target);
+
+  let bars = '';
+  weeks.forEach((w, i) => {
+    const val = byWeek[w];
+    const h = scale(val);
+    const x = gap + i * (barW + gap);
+    const y = topPad + chartH - h;
+    const color = val >= target ? 'var(--accent2)' : 'var(--accent)';
+    bars += `
+      <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h, 1)}" rx="4" fill="${color}"></rect>
+      <text x="${x + barW / 2}" y="${topPad + chartH + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">W${w}</text>
+      <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="10" fill="var(--text)">${val.toFixed(1)}</text>`;
+  });
+
+  weeklyChart.innerHTML = `
+    <svg viewBox="0 0 ${chartW} ${topPad + chartH + bottomPad}" style="width:100%;height:${topPad + chartH + bottomPad}px;">
+      <line x1="0" y1="${targetY}" x2="${chartW}" y2="${targetY}" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="4 3"></line>
+      <text x="4" y="${targetY - 4}" font-size="10" fill="var(--warn)">Target ${target}h</text>
+      ${bars}
+    </svg>`;
+
+  let cumActual = 0, cumTarget = 0;
+  cumulativeBody.innerHTML = weeks.map(w => {
+    const val = byWeek[w];
+    cumActual += val; cumTarget += target;
+    const diff = val - target;
+    const cumDiff = cumActual - cumTarget;
+    const diffColor = diff >= 0 ? 'var(--accent2)' : 'var(--danger)';
+    const cumColor = cumDiff >= 0 ? 'var(--accent2)' : 'var(--danger)';
+    return `<tr>
+      <td>Week ${w}</td>
+      <td>${val.toFixed(1)}h</td>
+      <td>${target}h</td>
+      <td style="color:${diffColor}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}h</td>
+      <td>${cumActual.toFixed(1)}h</td>
+      <td>${cumTarget.toFixed(1)}h</td>
+      <td style="color:${cumColor}">${cumDiff >= 0 ? '+' : ''}${cumDiff.toFixed(1)}h</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderStats(rows) {
