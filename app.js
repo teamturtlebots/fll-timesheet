@@ -1,6 +1,4 @@
-// ---------- Storage ----------
-const STORAGE_KEY = 'hourtrack_entries_v1';
-const ROSTER_KEY = 'hourtrack_roster_v1';
+// ---------- Firebase (shared cloud storage, no login) ----------
 const DEFAULT_ROSTER = ['Evan', 'Mason', 'Ellen', 'Eric', 'Stanley', 'Anya', 'Aiden'];
 const ACTIVITIES = ['Robot', 'Project', 'Community'];
 const SEASON_START = new Date('2026-07-20T00:00:00'); // Week 1 = 7/20–7/26
@@ -13,29 +11,11 @@ function computeWeek(dateStr) {
   return week < 1 ? 1 : week;
 }
 
-function loadEntries() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error('Failed to load entries', e);
-    return [];
-  }
-}
-function saveEntries(entries) { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+const db = firebase.firestore();
+try { db.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* offline cache unavailable, non-fatal */ }
 
-function loadRoster() {
-  try {
-    const raw = localStorage.getItem(ROSTER_KEY);
-    return raw ? JSON.parse(raw) : [...DEFAULT_ROSTER];
-  } catch (e) {
-    return [...DEFAULT_ROSTER];
-  }
-}
-function saveRoster(roster) { localStorage.setItem(ROSTER_KEY, JSON.stringify(roster)); }
-
-let entries = loadEntries();
-let roster = loadRoster();
+let entries = [];
+let roster = [...DEFAULT_ROSTER];
 
 let editingId = null;
 let sortKey = 'date';
@@ -94,8 +74,6 @@ mDate.addEventListener('input', refreshWeekDisplays);
 refreshWeekDisplays();
 
 // ---------- Helpers ----------
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -115,6 +93,26 @@ function escapeHtml(str) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 }
+
+// ---------- Live data from Firestore ----------
+statusEl.textContent = 'Connecting…';
+
+db.collection('entries').onSnapshot(snapshot => {
+  entries = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  render();
+}, err => toast('Sync error: ' + err.message));
+
+db.collection('meta').doc('roster').onSnapshot(doc => {
+  if (doc.exists && Array.isArray(doc.data().names) && doc.data().names.length) {
+    roster = doc.data().names;
+  } else {
+    // first time anyone's opened this — seed the shared roster
+    roster = [...DEFAULT_ROSTER];
+    db.collection('meta').doc('roster').set({ names: roster }).catch(() => {});
+  }
+  renderMatrix();
+  render();
+}, err => toast('Sync error: ' + err.message));
 
 // ---------- Top-level tabs (Entry / Summary) ----------
 document.querySelectorAll('.maintab').forEach(tab => {
@@ -149,9 +147,8 @@ function renderMatrix() {
 }
 
 function removeRosterRow(name) {
-  roster = roster.filter(n => n !== name);
-  saveRoster(roster);
-  renderMatrix();
+  const updated = roster.filter(n => n !== name);
+  db.collection('meta').doc('roster').set({ names: updated }).catch(err => toast('Error: ' + err.message));
 }
 window.removeRosterRow = removeRosterRow;
 
@@ -159,10 +156,10 @@ addRowBtn.addEventListener('click', () => {
   const name = newRowName.value.trim();
   if (!name) return;
   if (roster.includes(name)) { toast('Already in the list'); return; }
-  roster.push(name);
-  saveRoster(roster);
-  newRowName.value = '';
-  renderMatrix();
+  const updated = [...roster, name];
+  db.collection('meta').doc('roster').set({ names: updated })
+    .then(() => { newRowName.value = ''; })
+    .catch(err => toast('Error: ' + err.message));
 });
 newRowName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addRowBtn.click(); } });
 
@@ -187,7 +184,6 @@ commitMatrixBtn.addEventListener('click', () => {
       const val = parseFloat(inp.value);
       if (!isNaN(val) && val > 0) {
         newEntries.push({
-          id: uid(),
           name,
           date,
           activity: inp.dataset.activity,
@@ -201,13 +197,16 @@ commitMatrixBtn.addEventListener('click', () => {
 
   if (!newEntries.length) { toast('No hours entered'); return; }
 
-  entries.push(...newEntries);
-  saveEntries(entries);
-  matrixBody.querySelectorAll('input.hourcell').forEach(inp => inp.value = '');
-  matrixBody.querySelectorAll('input.commentcell').forEach(inp => inp.value = '');
-  mComments.value = '';
-  render();
-  toast(`Added ${newEntries.length} entr${newEntries.length === 1 ? 'y' : 'ies'}`);
+  const batch = db.batch();
+  newEntries.forEach(e => batch.set(db.collection('entries').doc(), e));
+  batch.commit()
+    .then(() => {
+      matrixBody.querySelectorAll('input.hourcell').forEach(inp => inp.value = '');
+      matrixBody.querySelectorAll('input.commentcell').forEach(inp => inp.value = '');
+      mComments.value = '';
+      toast(`Added ${newEntries.length} entr${newEntries.length === 1 ? 'y' : 'ies'}`);
+    })
+    .catch(err => toast('Error: ' + err.message));
 });
 
 // ---------- Render entries table ----------
@@ -264,7 +263,7 @@ function render() {
   renderMemberBars(entries);
   renderActivityPie(entries);
   renderWeeklyChart(entries);
-  statusEl.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · stored offline`;
+  statusEl.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · synced live`;
 }
 
 function renderMemberBars(rows) {
@@ -459,7 +458,6 @@ function renderStats(rows) {
 form.addEventListener('submit', (ev) => {
   ev.preventDefault();
   const entry = {
-    id: editingId || uid(),
     name: fName.value.trim(),
     date: fDate.value,
     activity: fActivity.value,
@@ -469,17 +467,16 @@ form.addEventListener('submit', (ev) => {
   };
   if (!entry.name || isNaN(entry.duration) || isNaN(entry.week)) return;
 
-  if (editingId) {
-    const idx = entries.findIndex(e => e.id === editingId);
-    if (idx > -1) entries[idx] = entry;
-    toast('Entry updated');
-  } else {
-    entries.push(entry);
-    toast('Entry added');
-  }
-  saveEntries(entries);
-  resetForm();
-  render();
+  const savePromise = editingId
+    ? db.collection('entries').doc(editingId).set(entry)
+    : db.collection('entries').add(entry);
+
+  savePromise
+    .then(() => {
+      toast(editingId ? 'Entry updated' : 'Entry added');
+      resetForm();
+    })
+    .catch(err => toast('Error: ' + err.message));
 });
 
 function startEdit(id) {
@@ -500,10 +497,9 @@ function startEdit(id) {
 
 function deleteEntry(id) {
   if (!confirm('Delete this entry?')) return;
-  entries = entries.filter(e => e.id !== id);
-  saveEntries(entries);
-  render();
-  toast('Entry deleted');
+  db.collection('entries').doc(id).delete()
+    .then(() => toast('Entry deleted'))
+    .catch(err => toast('Error: ' + err.message));
 }
 
 function resetForm() {
@@ -516,11 +512,14 @@ function resetForm() {
 cancelEditBtn.addEventListener('click', resetForm);
 
 document.getElementById('clearAllBtn').addEventListener('click', () => {
-  if (!confirm('Delete ALL entries? This cannot be undone.')) return;
-  entries = [];
-  saveEntries(entries);
-  render();
-  toast('All entries cleared');
+  if (!confirm('Delete ALL entries for everyone? This cannot be undone.')) return;
+  db.collection('entries').get().then(snapshot => {
+    const batch = db.batch();
+    snapshot.docs.forEach(d => batch.delete(d.ref));
+    return batch.commit();
+  })
+    .then(() => toast('All entries cleared'))
+    .catch(err => toast('Error: ' + err.message));
 });
 
 // ---------- Filters / sort ----------

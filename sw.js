@@ -1,10 +1,13 @@
-const CACHE_NAME = 'hourtrack-cache-v7';
+const CACHE_NAME = 'hourtrack-cache-v8';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+  './firebase-config.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js'
 ];
 
 self.addEventListener('install', (event) => {

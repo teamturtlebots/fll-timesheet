@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // No login: anyone with the site link can read AND write.
+    // That's the tradeoff for "no sign-in" — keep the URL semi-private (don't post it
+    // publicly) if you don't want randoms editing it. If you ever want real access
+    // control back, this is the file to tighten.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
