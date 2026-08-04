@@ -36,6 +36,7 @@ function saveRoster(roster) { localStorage.setItem(ROSTER_KEY, JSON.stringify(ro
 
 let entries = loadEntries();
 let roster = loadRoster();
+
 let editingId = null;
 let sortKey = 'date';
 let sortDir = 'desc';
@@ -115,7 +116,17 @@ function escapeHtml(str) {
   }[c]));
 }
 
-// ---------- Tabs ----------
+// ---------- Top-level tabs (Entry / Summary) ----------
+document.querySelectorAll('.maintab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.maintab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mainpanel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.maintab).classList.add('active');
+  });
+});
+
+// ---------- Tabs (Matrix / Single Entry, within the Entry panel) ----------
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
