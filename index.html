@@ -22,11 +22,9 @@
   header h1{font-size:17px;margin:0;display:flex;align-items:center;gap:8px;}
   header h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--accent2);}
   #status{font-size:11px;color:var(--muted);}
-  main{max-width:900px;margin:0 auto;padding:16px;}
+  main{max-width:960px;margin:0 auto;padding:16px;}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;}
   .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;}
-  form{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  form .full{grid-column:1/-1;}
   label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
   input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--border);
     color:var(--text);padding:9px 10px;border-radius:8px;font-size:14px;}
@@ -38,26 +36,59 @@
   .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
   .btn-sm{padding:5px 10px;font-size:12px;}
   .row-actions{display:flex;gap:6px;}
+
+  /* Tabs */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;}
+  .tab{padding:8px 14px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;}
+  .tab.active{background:var(--accent);color:#08122a;border-color:var(--accent);}
+  .tabpanel{display:none;}
+  .tabpanel.active{display:block;}
+
+  /* Matrix */
+  .meta-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .meta-row .full{grid-column:1/-1;}
+  table.matrix{width:100%;border-collapse:collapse;font-size:13px;}
+  table.matrix th,table.matrix td{border:1px solid var(--border);padding:6px;text-align:center;}
+  table.matrix th{color:var(--muted);font-size:11px;text-transform:uppercase;background:var(--panel2);}
+  table.matrix td.namecell{text-align:left;font-weight:600;background:var(--panel2);white-space:nowrap;}
+  table.matrix input.hourcell{width:64px;text-align:center;padding:6px 4px;}
+  table.matrix td.rmcell{border:none;padding:2px;}
+  .matrix-wrap{overflow-x:auto;}
+  .addrow-bar{display:flex;gap:8px;margin-top:10px;}
+  .addrow-bar input{flex:1;}
+
+  /* Image assist */
+  #imgDropZone{border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;
+    color:var(--muted);font-size:13px;cursor:pointer;}
+  #imgDropZone:hover{border-color:var(--accent);}
+  #imgPreviewWrap{display:none;margin-top:12px;}
+  #imgPreviewWrap img{max-width:100%;max-height:420px;border-radius:8px;border:1px solid var(--border);
+    cursor:zoom-in;display:block;margin:0 auto;}
+  #imgZoomOverlay{display:none;position:fixed;inset:0;background:#000c;z-index:100;
+    align-items:center;justify-content:center;padding:20px;cursor:zoom-out;}
+  #imgZoomOverlay img{max-width:95%;max-height:95%;border-radius:8px;}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;}
   .filters select,.filters input{width:auto;min-width:110px;}
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);}
-  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;cursor:pointer;user-select:none;}
-  tbody tr:hover{background:var(--panel2);}
+  table.entries{width:100%;border-collapse:collapse;font-size:13px;}
+  table.entries th,table.entries td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);}
+  table.entries th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;cursor:pointer;user-select:none;}
+  table.entries tbody tr:hover{background:var(--panel2);}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#22314f;font-size:11px;color:var(--accent);}
   .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:13px;}
   .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:10px;}
   .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
   .stat .val{font-size:20px;font-weight:700;}
   .stat .lbl{font-size:11px;color:var(--muted);}
-  .subtable{margin-top:10px;}
   .actions-row{display:flex;gap:8px;flex-wrap:wrap;}
   #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
     background:var(--panel2);border:1px solid var(--border);padding:10px 16px;border-radius:8px;
     font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;}
   #toast.show{opacity:1;}
-  @media(max-width:520px){form{grid-template-columns:1fr;}}
+  @media(max-width:520px){.meta-row{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -71,49 +102,109 @@
 
   <div class="card">
     <h2>Log Time</h2>
-    <form id="entryForm">
-      <div>
-        <label for="fName">Name</label>
-        <input list="nameList" id="fName" required placeholder="e.g. Caden">
-        <datalist id="nameList"></datalist>
+    <div class="tabs">
+      <div class="tab active" data-tab="matrix">Matrix Entry</div>
+      <div class="tab" data-tab="image">From Photo</div>
+      <div class="tab" data-tab="single">Single Entry</div>
+    </div>
+
+    <!-- MATRIX TAB -->
+    <div class="tabpanel active" id="tab-matrix">
+      <div class="meta-row">
+        <div>
+          <label for="mDate">Date (applies to whole save)</label>
+          <input type="date" id="mDate">
+        </div>
+        <div>
+          <label for="mWeek">Week (applies to whole save)</label>
+          <input type="number" id="mWeek" min="1">
+        </div>
+        <div class="full">
+          <label for="mComments">Comments (optional, applies to whole save)</label>
+          <textarea id="mComments" placeholder="class, home practice, etc."></textarea>
+        </div>
       </div>
-      <div>
-        <label for="fDate">Date</label>
-        <input type="date" id="fDate" required>
+
+      <div class="matrix-wrap">
+        <table class="matrix" id="matrixTable">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Name</th>
+              <th>Robot</th>
+              <th>Project</th>
+              <th>Community</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
       </div>
-      <div>
-        <label for="fActivity">Activity</label>
-        <select id="fActivity" required>
-          <option value="Robot design">Robot design</option>
-          <option value="Programming">Programming</option>
-          <option value="Building">Building</option>
-          <option value="Core Values">Core Values</option>
-          <option value="Research">Research</option>
-          <option value="Documentation">Documentation</option>
-          <option value="Strategy / Missions">Strategy / Missions</option>
-          <option value="Testing / Driving practice">Testing / Driving practice</option>
-          <option value="Competition">Competition</option>
-          <option value="Outreach">Outreach</option>
-          <option value="Other">Other</option>
-        </select>
+      <div class="addrow-bar">
+        <input type="text" id="newRowName" placeholder="Add person…">
+        <button class="btn btn-secondary btn-sm" id="addRowBtn">Add Row</button>
       </div>
-      <div>
-        <label for="fDuration">Duration (hours)</label>
-        <input type="number" id="fDuration" step="0.25" min="0" required placeholder="1.5">
+
+      <div class="actions-row" style="margin-top:14px;">
+        <button class="btn btn-primary" id="commitMatrixBtn">Add Entries</button>
+        <button class="btn btn-secondary" id="clearMatrixBtn">Clear Hours</button>
       </div>
-      <div>
-        <label for="fWeek">Week</label>
-        <input type="number" id="fWeek" min="1" required placeholder="1">
+    </div>
+
+    <!-- IMAGE TAB -->
+    <div class="tabpanel" id="tab-image">
+      <div id="imgDropZone">
+        📷 Tap to upload a photo of your hours sheet<br>
+        <span style="font-size:11px;">It'll appear below so you can copy the numbers into the matrix.</span>
       </div>
-      <div class="full">
-        <label for="fComments">Comments (optional)</label>
-        <textarea id="fComments" placeholder="class, home practice, etc."></textarea>
+      <input type="file" id="imgInput" accept="image/*" style="display:none;">
+      <div id="imgPreviewWrap">
+        <img id="imgPreview" alt="Uploaded sheet">
       </div>
-      <div class="full">
-        <button type="submit" class="btn btn-primary" id="submitBtn">Add Entry</button>
-        <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
-      </div>
-    </form>
+      <p class="hint">
+        This app can't auto-read handwriting (that needs an AI vision service with an API key, which isn't safe
+        to embed in a public site). Instead: upload the photo, then switch to <b>Matrix Entry</b> — the image stays
+        visible here so you can flip back and forth while you type the numbers in.
+      </p>
+    </div>
+
+    <!-- SINGLE ENTRY TAB -->
+    <div class="tabpanel" id="tab-single">
+      <form id="entryForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label for="fName">Name</label>
+          <input list="nameList" id="fName" required placeholder="e.g. Caden">
+          <datalist id="nameList"></datalist>
+        </div>
+        <div>
+          <label for="fDate">Date</label>
+          <input type="date" id="fDate" required>
+        </div>
+        <div>
+          <label for="fActivity">Activity</label>
+          <select id="fActivity" required>
+            <option value="Robot">Robot</option>
+            <option value="Project">Project</option>
+            <option value="Community">Community</option>
+          </select>
+        </div>
+        <div>
+          <label for="fDuration">Duration (hours)</label>
+          <input type="number" id="fDuration" step="0.25" min="0" required placeholder="1.5">
+        </div>
+        <div>
+          <label for="fWeek">Week</label>
+          <input type="number" id="fWeek" min="1" required placeholder="1">
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <label for="fComments">Comments (optional)</label>
+          <textarea id="fComments" placeholder="class, home practice, etc."></textarea>
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <button type="submit" class="btn btn-primary" id="submitBtn">Add Entry</button>
+          <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div class="card">
@@ -138,7 +229,7 @@
       </div>
     </div>
     <div style="overflow-x:auto;">
-    <table>
+    <table class="entries">
       <thead>
         <tr>
           <th data-sort="name">Name</th>
@@ -158,6 +249,7 @@
 
 </main>
 
+<div id="imgZoomOverlay"><img id="imgZoomImg" alt="Zoomed sheet"></div>
 <div id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
