@@ -299,41 +299,90 @@
 
   <div class="card">
     <h2>Log Volunteer Time</h2>
-    <form id="volunteerForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div>
-        <label for="vDate">Date</label>
-        <input type="date" id="vDate" required>
+    <div class="tabs">
+      <div class="tab active" data-tab="vmatrix">Matrix Entry</div>
+      <div class="tab" data-tab="vsingle">Single Entry</div>
+    </div>
+
+    <!-- VOLUNTEER MATRIX TAB -->
+    <div class="tabpanel active" id="tab-vmatrix">
+      <div class="meta-row">
+        <div>
+          <label for="vmDate">Date (applies to whole save)</label>
+          <input type="date" id="vmDate">
+        </div>
       </div>
-      <div>
-        <label for="vVolunteer">Volunteer Name</label>
-        <select id="vVolunteer" required>
-          <option value="" disabled selected>Select volunteer…</option>
-          <option value="Liang Xue">Liang Xue</option>
-          <option value="Sheng Yin">Sheng Yin</option>
-          <option value="Bin Lu">Bin Lu</option>
-        </select>
+
+      <div class="matrix-wrap">
+        <table class="matrix" id="volunteerMatrixTable">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Volunteer</th>
+              <th>Begin</th>
+              <th>End</th>
+              <th>Hours</th>
+              <th style="text-align:left;">Description</th>
+            </tr>
+          </thead>
+          <tbody id="volunteerMatrixBody"></tbody>
+        </table>
       </div>
-      <div>
-        <label for="vBegin">Begin Time</label>
-        <input type="time" id="vBegin" required>
+
+      <div style="margin-top:12px;">
+        <label for="vmComments">Description (optional — applied to every entry in this save, on top of any row description)</label>
+        <textarea id="vmComments" placeholder="e.g. FLL class"></textarea>
       </div>
-      <div>
-        <label for="vEnd">End Time</label>
-        <input type="time" id="vEnd" required>
+
+      <div class="actions-row" style="margin-top:14px;">
+        <button class="btn btn-secondary" id="vCopyLastBtn">📋 Copy Most Recent Entries</button>
+        <button class="btn btn-primary" id="vCommitMatrixBtn">Add Entries</button>
+        <button class="btn btn-secondary" id="vClearMatrixBtn">Clear Times</button>
       </div>
-      <div class="full" style="grid-column:1/-1;">
-        <label for="vHours">Hours (auto-calculated)</label>
-        <input type="text" id="vHours" readonly placeholder="fill in times above">
-      </div>
-      <div class="full" style="grid-column:1/-1;">
-        <label for="vDescription">Description</label>
-        <textarea id="vDescription" placeholder="e.g. FLL class, guide team build mission models"></textarea>
-      </div>
-      <div class="full" style="grid-column:1/-1;">
-        <button type="submit" class="btn btn-primary" id="vSubmitBtn">Add Entry</button>
-        <button type="button" class="btn btn-secondary" id="vCancelEditBtn" style="display:none;">Cancel Edit</button>
-      </div>
-    </form>
+      <p class="hint">
+        <b>Copy Most Recent Entries</b> fills each volunteer's row with their last saved begin/end time and
+        description — usually all you need to do then is update the date.
+      </p>
+    </div>
+
+    <!-- VOLUNTEER SINGLE ENTRY TAB -->
+    <div class="tabpanel" id="tab-vsingle">
+      <form id="volunteerForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label for="vDate">Date</label>
+          <input type="date" id="vDate" required>
+        </div>
+        <div>
+          <label for="vVolunteer">Volunteer Name</label>
+          <select id="vVolunteer" required>
+            <option value="" disabled selected>Select volunteer…</option>
+            <option value="Liang Xue">Liang Xue</option>
+            <option value="Sheng Yin">Sheng Yin</option>
+            <option value="Bin Lu">Bin Lu</option>
+          </select>
+        </div>
+        <div>
+          <label for="vBegin">Begin Time</label>
+          <input type="time" id="vBegin" required>
+        </div>
+        <div>
+          <label for="vEnd">End Time</label>
+          <input type="time" id="vEnd" required>
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <label for="vHours">Hours (auto-calculated)</label>
+          <input type="text" id="vHours" readonly placeholder="fill in times above">
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <label for="vDescription">Description</label>
+          <textarea id="vDescription" placeholder="e.g. FLL class, guide team build mission models"></textarea>
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <button type="submit" class="btn btn-primary" id="vSubmitBtn">Add Entry</button>
+          <button type="button" class="btn btn-secondary" id="vCancelEditBtn" style="display:none;">Cancel Edit</button>
+        </div>
+      </form>
+    </div>
+
     <div class="actions-row" id="vImportRow" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
       <button class="btn btn-secondary btn-sm" id="vImportBtn">📥 Import Historical Records</button>
     </div>

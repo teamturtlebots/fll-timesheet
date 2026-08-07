@@ -1,5 +1,6 @@
 // ---------- Firebase (shared cloud storage, no login) ----------
 const DEFAULT_ROSTER = ['Evan', 'Mason', 'Ellen', 'Eric', 'Stanley', 'Anya', 'Aiden'];
+const VOLUNTEER_ROSTER = ['Liang Xue', 'Sheng Yin', 'Bin Lu'];
 const ACTIVITIES = ['Robot', 'Project', 'Community'];
 const SEASON_START = new Date('2026-07-20T00:00:00'); // Week 1 = 7/20–7/26
 
@@ -83,11 +84,18 @@ const vFilterMonth = document.getElementById('vFilterMonth');
 const volunteerMonthlyHead = document.getElementById('volunteerMonthlyHead');
 const volunteerMonthlyBody = document.getElementById('volunteerMonthlyBody');
 const vMonthlyEmpty = document.getElementById('vMonthlyEmpty');
+const vmDate = document.getElementById('vmDate');
+const vmComments = document.getElementById('vmComments');
+const volunteerMatrixBody = document.getElementById('volunteerMatrixBody');
+const vCopyLastBtn = document.getElementById('vCopyLastBtn');
+const vCommitMatrixBtn = document.getElementById('vCommitMatrixBtn');
+const vClearMatrixBtn = document.getElementById('vClearMatrixBtn');
 
 const todayStr = new Date().toISOString().slice(0, 10);
 fDate.value = todayStr;
 mDate.value = todayStr;
 vDate.value = todayStr;
+vmDate.value = todayStr;
 
 function refreshWeekDisplays() {
   fWeek.value = computeWeek(fDate.value);
@@ -112,6 +120,84 @@ function refreshVHours() {
 }
 vBegin.addEventListener('input', refreshVHours);
 vEnd.addEventListener('input', refreshVHours);
+
+// ---------- Volunteer matrix entry ----------
+function renderVolunteerMatrix() {
+  volunteerMatrixBody.innerHTML = VOLUNTEER_ROSTER.map(name => `
+    <tr data-volunteer="${escapeHtml(name)}">
+      <td class="namecell">${escapeHtml(name)}</td>
+      <td><input type="time" class="vm-begin"></td>
+      <td><input type="time" class="vm-end"></td>
+      <td><input type="text" class="vm-hours" readonly></td>
+      <td><input type="text" class="vm-desc" placeholder="optional"></td>
+    </tr>
+  `).join('');
+
+  volunteerMatrixBody.querySelectorAll('tr').forEach(tr => {
+    const begin = tr.querySelector('.vm-begin');
+    const end = tr.querySelector('.vm-end');
+    const hoursField = tr.querySelector('.vm-hours');
+    const updateRowHours = () => {
+      const h = computeHoursFromTimes(begin.value, end.value);
+      hoursField.value = h === null ? '' : h;
+    };
+    begin.addEventListener('input', updateRowHours);
+    end.addEventListener('input', updateRowHours);
+  });
+}
+
+vClearMatrixBtn.addEventListener('click', () => {
+  volunteerMatrixBody.querySelectorAll('.vm-begin, .vm-end, .vm-desc, .vm-hours').forEach(inp => inp.value = '');
+  vmComments.value = '';
+});
+
+vCopyLastBtn.addEventListener('click', () => {
+  let copied = 0;
+  volunteerMatrixBody.querySelectorAll('tr').forEach(tr => {
+    const name = tr.dataset.volunteer;
+    const matches = volunteerEntries.filter(e => e.volunteer === name);
+    if (!matches.length) return;
+    const last = matches.reduce((a, b) => (b.date > a.date ? b : a));
+    tr.querySelector('.vm-begin').value = last.beginTime || '';
+    tr.querySelector('.vm-end').value = last.endTime || '';
+    tr.querySelector('.vm-desc').value = last.description || '';
+    const h = computeHoursFromTimes(last.beginTime, last.endTime);
+    tr.querySelector('.vm-hours').value = h === null ? '' : h;
+    copied++;
+  });
+  toast(copied ? `Copied last entry for ${copied} volunteer${copied === 1 ? '' : 's'} — just update the date` : 'No previous entries to copy yet');
+});
+
+vCommitMatrixBtn.addEventListener('click', () => {
+  const date = vmDate.value;
+  const overallDesc = vmComments.value.trim();
+  if (!date) { toast('Pick a date first'); return; }
+
+  const newEntries = [];
+  volunteerMatrixBody.querySelectorAll('tr').forEach(tr => {
+    const name = tr.dataset.volunteer;
+    const begin = tr.querySelector('.vm-begin').value;
+    const end = tr.querySelector('.vm-end').value;
+    if (!begin || !end) return;
+    const hours = computeHoursFromTimes(begin, end);
+    if (hours === null) return;
+    const rowDesc = tr.querySelector('.vm-desc').value.trim();
+    const description = rowDesc && overallDesc ? `${rowDesc} | ${overallDesc}` : (rowDesc || overallDesc);
+    newEntries.push({ date, beginTime: begin, endTime: end, hours, volunteer: name, description });
+  });
+
+  if (!newEntries.length) { toast('No times entered'); return; }
+
+  const batch = db.batch();
+  newEntries.forEach(e => batch.set(db.collection('volunteerEntries').doc(), e));
+  batch.commit()
+    .then(() => {
+      volunteerMatrixBody.querySelectorAll('.vm-begin, .vm-end, .vm-desc, .vm-hours').forEach(inp => inp.value = '');
+      vmComments.value = '';
+      toast(`Added ${newEntries.length} entr${newEntries.length === 1 ? 'y' : 'ies'}`);
+    })
+    .catch(err => toast('Error: ' + err.message));
+});
 
 // ---------- Helpers ----------
 function toast(msg) {
@@ -169,13 +255,14 @@ document.querySelectorAll('.maintab').forEach(tab => {
   });
 });
 
-// ---------- Tabs (Matrix / Single Entry, within the Entry panel) ----------
+// ---------- Tabs (Matrix / Single Entry sub-tabs, scoped per card) ----------
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('active'));
+    const scope = tab.closest('.card') || document;
+    scope.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    scope.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    scope.querySelector('#tab-' + tab.dataset.tab).classList.add('active');
   });
 });
 
@@ -732,6 +819,7 @@ volunteerForm.addEventListener('submit', ev => {
 function startVolunteerEdit(id) {
   const e = volunteerEntries.find(x => x.id === id);
   if (!e) return;
+  document.querySelector('#tab-vsingle').closest('.card').querySelector('.tab[data-tab="vsingle"]').click();
   vEditingId = id;
   vDate.value = e.date;
   vBegin.value = e.beginTime;
@@ -952,4 +1040,5 @@ window.deleteEntry = deleteEntry;
 // ---------- Init ----------
 renderMatrix();
 render();
+renderVolunteerMatrix();
 renderVolunteers();
