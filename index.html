@@ -306,8 +306,12 @@
       </div>
       <div>
         <label for="vVolunteer">Volunteer Name</label>
-        <input list="volunteerList" id="vVolunteer" required placeholder="e.g. Liang Xue">
-        <datalist id="volunteerList"></datalist>
+        <select id="vVolunteer" required>
+          <option value="" disabled selected>Select volunteer…</option>
+          <option value="Liang Xue">Liang Xue</option>
+          <option value="Sheng Yin">Sheng Yin</option>
+          <option value="Bin Lu">Bin Lu</option>
+        </select>
       </div>
       <div>
         <label for="vBegin">Begin Time</label>
@@ -330,6 +334,13 @@
         <button type="button" class="btn btn-secondary" id="vCancelEditBtn" style="display:none;">Cancel Edit</button>
       </div>
     </form>
+    <div class="actions-row" id="vImportRow" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary btn-sm" id="vImportBtn">📥 Import Historical Records</button>
+    </div>
+    <p class="hint" id="vImportHint">
+      One-time import of your past spreadsheet records. Safe to click once — if you run it twice you'll get
+      duplicates (just delete the extras from the list below if that happens).
+    </p>
   </div>
 
   <div class="card">

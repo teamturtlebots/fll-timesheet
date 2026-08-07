@@ -74,7 +74,6 @@ const vBegin = document.getElementById('vBegin');
 const vEnd = document.getElementById('vEnd');
 const vHours = document.getElementById('vHours');
 const vDescription = document.getElementById('vDescription');
-const volunteerList = document.getElementById('volunteerList');
 const vSubmitBtn = document.getElementById('vSubmitBtn');
 const vCancelEditBtn = document.getElementById('vCancelEditBtn');
 const volunteerEntriesBody = document.getElementById('volunteerEntriesBody');
@@ -626,6 +625,64 @@ document.getElementById('exportCsvBtn').addEventListener('click', () => {
 });
 
 // ---------- Volunteer time tracking ----------
+const VOLUNTEER_SEED_DATA = [
+  { date: '2025-02-07', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-02-09', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-02-14', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-02-15', beginTime: '08:00', endTime: '14:00', hours: 6.0, volunteer: 'Sheng Yin', description: 'FLL Competition' },
+  { date: '2025-02-23', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-02-28', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-03-02', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-03-09', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-03-16', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-03-23', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-03-28', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-03-30', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-04-13', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'Competition Prep class' },
+  { date: '2025-04-19', beginTime: '07:00', endTime: '11:00', hours: 4.0, volunteer: 'Sheng Yin', description: 'World Festival Competiton' },
+  { date: '2025-08-10', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-08-17', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-08-24', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-08-31', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-09-07', beginTime: '09:00', endTime: '14:00', hours: 5.0, volunteer: 'Sheng Yin', description: 'supervise market event' },
+  { date: '2025-09-14', beginTime: '16:00', endTime: '18:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'supervise autism kids STEM event' },
+  { date: '2025-09-28', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-10-05', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-10-19', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-10-24', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-10-26', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-11-02', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-11-09', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-11-16', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-11-22', beginTime: '10:00', endTime: '14:00', hours: 4.0, volunteer: 'Sheng Yin', description: 'FLL scrimmage' },
+  { date: '2025-11-30', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-12-07', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2025-12-12', beginTime: '18:00', endTime: '20:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'Competition Prep class' },
+  { date: '2025-12-13', beginTime: '09:00', endTime: '01:00', hours: 4.0, volunteer: 'Sheng Yin', description: 'FLL Competition' },
+  { date: '2025-12-28', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-01-11', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-01-23', beginTime: '18:00', endTime: '20:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'Competition Prep class' },
+  { date: '2026-01-24', beginTime: '09:00', endTime: '13:00', hours: 4.0, volunteer: 'Sheng Yin', description: 'FLL Competition' },
+  { date: '2026-02-07', beginTime: '08:30', endTime: '15:30', hours: 7.0, volunteer: 'Sheng Yin', description: 'FLL Competition' },
+  { date: '2026-03-01', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-03-06', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-03-08', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-03-22', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-03-29', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-04-13', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-04-18', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-04-24', beginTime: '19:00', endTime: '21:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-04-26', beginTime: '10:00', endTime: '12:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-04-29', beginTime: '09:00', endTime: '11:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-04-30', beginTime: '09:00', endTime: '11:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-05-01', beginTime: '09:00', endTime: '11:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-05-02', beginTime: '09:00', endTime: '11:00', hours: 2.0, volunteer: 'Sheng Yin', description: 'FLL class' },
+  { date: '2026-08-04', beginTime: '18:30', endTime: '20:30', hours: 2.0, volunteer: 'Liang Xue', description: 'FLL class, guide team build mission models' },
+  { date: '2026-08-07', beginTime: '21:00', endTime: '22:00', hours: 1.0, volunteer: 'Liang Xue', description: 'Coach/Mentor Meeting' },
+  { date: '2026-08-07', beginTime: '21:00', endTime: '22:00', hours: 1.0, volunteer: 'Sheng Yin', description: 'Coach/Mentor Meeting' }
+];
+
+
 function fmtTime(t) {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
@@ -717,9 +774,24 @@ document.getElementById('vClearAllBtn').addEventListener('click', () => {
     .catch(err => toast('Error: ' + err.message));
 });
 
+document.getElementById('vImportBtn').addEventListener('click', () => {
+  if (!confirm(`Import ${VOLUNTEER_SEED_DATA.length} historical records? Only do this once — running it again will create duplicates.`)) return;
+  const batch = db.batch();
+  VOLUNTEER_SEED_DATA.forEach(rec => batch.set(db.collection('volunteerEntries').doc(), rec));
+  batch.set(db.collection('meta').doc('volunteerImportStatus'), { imported: true, importedAt: new Date().toISOString() });
+  batch.commit()
+    .then(() => toast(`Imported ${VOLUNTEER_SEED_DATA.length} records`))
+    .catch(err => toast('Error: ' + err.message));
+});
+
+db.collection('meta').doc('volunteerImportStatus').onSnapshot(doc => {
+  const done = doc.exists && doc.data().imported;
+  document.getElementById('vImportRow').style.display = done ? 'none' : 'flex';
+  document.getElementById('vImportHint').style.display = done ? 'none' : 'block';
+});
+
 function renderVolunteers() {
   const names = [...new Set(volunteerEntries.map(e => e.volunteer))].sort();
-  volunteerList.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
 
   const curVolFilter = vFilterVolunteer.value;
   vFilterVolunteer.innerHTML = '<option value="">All volunteers</option>' +
