@@ -52,6 +52,9 @@
   .tab{padding:8px 14px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);
     color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;}
   .tab.active{background:var(--accent);color:#08122a;border-color:var(--accent);}
+  .vmtab{padding:6px 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;display:inline-block;}
+  .vmtab.active{background:var(--accent);color:#08122a;border-color:var(--accent);}
   .tabpanel{display:none;}
   .tabpanel.active{display:block;}
 
@@ -227,6 +230,7 @@
       <div class="actions-row">
         <button class="btn btn-secondary btn-sm" id="exportXlsxBtn">Export .xlsx</button>
         <button class="btn btn-secondary btn-sm" id="exportCsvBtn">Export .csv</button>
+        <button class="danger-link" id="clearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
       </div>
     </div>
     <div class="toolbar">
@@ -253,7 +257,6 @@
     </table>
     </div>
     <div class="empty" id="emptyMsg" style="display:none;">No entries yet — add your first one above.</div>
-    <button class="danger-link" id="clearAllBtn">Clear all records (admin)</button>
   </div>
 
 </div>
@@ -397,10 +400,37 @@
 
   <div class="card">
     <div class="toolbar">
-      <h2 style="margin:0;">Volunteer Entries</h2>
+      <h2 style="margin:0;">Monthly Summary by Person</h2>
+      <div class="actions-row">
+        <div class="tabs" style="margin-bottom:0;">
+          <div class="vmtab active" data-vmview="chart">📊 Chart</div>
+          <div class="vmtab" data-vmview="table">📋 Table</div>
+        </div>
+      </div>
+    </div>
+    <div id="volunteerMonthlyChartWrap">
+      <div class="legend-row" id="volunteerMonthlyLegend"></div>
+      <div id="volunteerMonthlyChart"></div>
+    </div>
+    <div id="volunteerMonthlyTableWrap" style="display:none;overflow-x:auto;">
+      <table class="entries weeklytable" id="volunteerMonthlyTable">
+        <thead id="volunteerMonthlyHead"></thead>
+        <tbody id="volunteerMonthlyBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="vMonthlyEmpty" style="display:none;">No data yet.</div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div>
+        <h2 style="margin:0;">Volunteer Entries</h2>
+        <div id="vFilteredTotal" style="font-size:22px;font-weight:700;color:var(--accent2);margin-top:4px;"></div>
+      </div>
       <div class="actions-row">
         <button class="btn btn-secondary btn-sm" id="vExportXlsxBtn">Export .xlsx</button>
         <button class="btn btn-secondary btn-sm" id="vExportCsvBtn">Export .csv</button>
+        <button class="danger-link" id="vClearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
       </div>
     </div>
     <div class="toolbar">
@@ -426,18 +456,6 @@
       </table>
     </div>
     <div class="empty" id="vEmptyMsg" style="display:none;">No volunteer entries yet — add the first one above.</div>
-    <button class="danger-link" id="vClearAllBtn">Clear all records (admin)</button>
-  </div>
-
-  <div class="card">
-    <h2>Monthly Summary by Person</h2>
-    <div style="overflow-x:auto;">
-      <table class="entries weeklytable" id="volunteerMonthlyTable">
-        <thead id="volunteerMonthlyHead"></thead>
-        <tbody id="volunteerMonthlyBody"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="vMonthlyEmpty" style="display:none;">No data yet.</div>
   </div>
 
 </div>

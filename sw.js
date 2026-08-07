@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hourtrack-cache-v13';
+const CACHE_NAME = 'hourtrack-cache-v15';
 const ASSETS = [
   './',
   './index.html',

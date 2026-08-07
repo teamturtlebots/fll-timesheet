@@ -92,8 +92,11 @@ const vEmptyMsg = document.getElementById('vEmptyMsg');
 const vFilterVolunteer = document.getElementById('vFilterVolunteer');
 const vFilterMonth = document.getElementById('vFilterMonth');
 const volunteerMonthlyHead = document.getElementById('volunteerMonthlyHead');
+const vFilteredTotal = document.getElementById('vFilteredTotal');
 const volunteerMonthlyBody = document.getElementById('volunteerMonthlyBody');
 const vMonthlyEmpty = document.getElementById('vMonthlyEmpty');
+const volunteerMonthlyChart = document.getElementById('volunteerMonthlyChart');
+const volunteerMonthlyLegend = document.getElementById('volunteerMonthlyLegend');
 const vmDate = document.getElementById('vmDate');
 const vmComments = document.getElementById('vmComments');
 const volunteerMatrixBody = document.getElementById('volunteerMatrixBody');
@@ -798,6 +801,11 @@ function monthLabel(key) {
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
 }
+function monthLabelShort(key) {
+  const [y, m] = key.split('-').map(Number);
+  const d = new Date(y, m - 1, 1);
+  return d.toLocaleString('en-US', { month: 'short' }) + " '" + String(y).slice(2);
+}
 
 volunteerForm.addEventListener('submit', ev => {
   ev.preventDefault();
@@ -937,8 +945,31 @@ function renderVolunteers() {
 
   vEmptyMsg.style.display = rows.length === 0 ? 'block' : 'none';
 
+  const filteredTotal = rows.reduce((s, e) => s + Number(e.hours), 0);
+  const filterLabel = [
+    vFilterVolunteer.value || 'All volunteers',
+    vFilterMonth.value ? monthLabel(vFilterMonth.value) : 'All months'
+  ].join(' · ');
+  vFilteredTotal.textContent = rows.length
+    ? `Total: ${fmtHours(filteredTotal)} hours (${filterLabel})`
+    : 'Total: 0 hours';
+
   renderVolunteerMonthly(volunteerEntries);
 }
+
+const VOLUNTEER_COLORS = { 'Liang Xue': '#4f8ef7', 'Sheng Yin': '#3ddc97', 'Bin Lu': '#f5b93d' };
+let volunteerMonthlyView = 'chart';
+
+document.querySelectorAll('.vmtab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.vmtab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    volunteerMonthlyView = tab.dataset.vmview;
+    document.getElementById('volunteerMonthlyChartWrap').style.display = volunteerMonthlyView === 'chart' ? 'block' : 'none';
+    document.getElementById('volunteerMonthlyTableWrap').style.display = volunteerMonthlyView === 'table' ? 'block' : 'none';
+    renderVolunteerMonthly(volunteerEntries);
+  });
+});
 
 function renderVolunteerMonthly(rows) {
   const months = [...new Set(rows.map(e => monthKey(e.date)))].filter(Boolean).sort();
@@ -947,6 +978,8 @@ function renderVolunteerMonthly(rows) {
   if (!months.length || !volunteers.length) {
     volunteerMonthlyHead.innerHTML = '';
     volunteerMonthlyBody.innerHTML = '';
+    volunteerMonthlyChart.innerHTML = '';
+    volunteerMonthlyLegend.innerHTML = '';
     vMonthlyEmpty.style.display = 'block';
     return;
   }
@@ -961,6 +994,53 @@ function renderVolunteerMonthly(rows) {
     totals[e.volunteer].total += Number(e.hours);
   });
 
+  if (volunteerMonthlyView === 'chart') {
+    renderVolunteerMonthlyChart(months, volunteers, totals);
+  } else {
+    renderVolunteerMonthlyTable(months, volunteers, totals);
+  }
+}
+
+function renderVolunteerMonthlyChart(months, volunteers, totals) {
+  volunteerMonthlyLegend.innerHTML = volunteers.map(v =>
+    `<span class="legend-item"><span class="swatch" style="background:${VOLUNTEER_COLORS[v] || 'var(--accent)'}"></span>${escapeHtml(v)}</span>`
+  ).join('');
+
+  const monthTotals = {};
+  months.forEach(m => {
+    monthTotals[m] = volunteers.reduce((s, v) => s + totals[v][m], 0);
+  });
+  const maxVal = Math.max(...Object.values(monthTotals), 1);
+
+  const barW = 40, gap = 18, chartH = 160, topPad = 16, bottomPad = 22;
+  const chartW = months.length * (barW + gap) + gap;
+  const scale = v => (v / maxVal) * chartH;
+
+  let bars = '';
+  months.forEach((m, i) => {
+    const x = gap + i * (barW + gap);
+    let yCursor = topPad + chartH;
+    let segs = '';
+    volunteers.forEach(v => {
+      const val = totals[v][m];
+      if (val <= 0) return;
+      const h = scale(val);
+      yCursor -= h;
+      segs += `<rect x="${x}" y="${yCursor}" width="${barW}" height="${h}" fill="${VOLUNTEER_COLORS[v] || 'var(--accent)'}"></rect>`;
+    });
+    const total = monthTotals[m];
+    bars += segs + `
+      <text x="${x + barW / 2}" y="${topPad + chartH + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">${monthLabelShort(m)}</text>
+      <text x="${x + barW / 2}" y="${topPad + chartH - scale(total) - 4}" text-anchor="middle" font-size="10" fill="var(--text)">${fmtHours(total)}</text>`;
+  });
+
+  volunteerMonthlyChart.innerHTML = `
+    <svg viewBox="0 0 ${chartW} ${topPad + chartH + bottomPad}" style="width:100%;height:${topPad + chartH + bottomPad}px;">
+      ${bars}
+    </svg>`;
+}
+
+function renderVolunteerMonthlyTable(months, volunteers, totals) {
   volunteerMonthlyHead.innerHTML = `<tr><th>Volunteer</th>${months.map(m => `<th>${monthLabel(m)}</th>`).join('')}<th>Total</th></tr>`;
 
   const monthTotals = {};
