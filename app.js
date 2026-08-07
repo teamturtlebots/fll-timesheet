@@ -1,6 +1,16 @@
 // ---------- Firebase (shared cloud storage, no login) ----------
 const DEFAULT_ROSTER = ['Evan', 'Mason', 'Ellen', 'Eric', 'Stanley', 'Anya', 'Aiden'];
 const VOLUNTEER_ROSTER = ['Liang Xue', 'Sheng Yin', 'Bin Lu'];
+
+// Change this to whatever you want — only people who know it can bulk-delete records.
+const ADMIN_PASSCODE = 'ttb';
+
+function requireAdminPasscode(actionLabel) {
+  const entered = prompt(`Enter the admin passcode to ${actionLabel}:`);
+  if (entered === null) return false; // cancelled
+  if (entered !== ADMIN_PASSCODE) { toast('Incorrect passcode'); return false; }
+  return true;
+}
 const ACTIVITIES = ['Robot', 'Project', 'Community'];
 const SEASON_START = new Date('2026-07-20T00:00:00'); // Week 1 = 7/20–7/26
 
@@ -644,6 +654,7 @@ function resetForm() {
 cancelEditBtn.addEventListener('click', resetForm);
 
 document.getElementById('clearAllBtn').addEventListener('click', () => {
+  if (!requireAdminPasscode("delete ALL kids' hour entries")) return;
   if (!confirm('Delete ALL entries for everyone? This cannot be undone.')) return;
   db.collection('entries').get().then(snapshot => {
     const batch = db.batch();
@@ -852,6 +863,7 @@ function resetVolunteerForm() {
 vCancelEditBtn.addEventListener('click', resetVolunteerForm);
 
 document.getElementById('vClearAllBtn').addEventListener('click', () => {
+  if (!requireAdminPasscode('delete ALL volunteer entries')) return;
   if (!confirm('Delete ALL volunteer entries for everyone? This cannot be undone.')) return;
   db.collection('volunteerEntries').get().then(snapshot => {
     const batch = db.batch();

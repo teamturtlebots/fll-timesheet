@@ -70,6 +70,9 @@
 
   .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
   .hint code{background:var(--panel2);padding:1px 5px;border-radius:4px;}
+  .danger-link{background:none;border:none;color:var(--muted);font-size:11px;
+    text-decoration:underline;cursor:pointer;padding:10px 0 0;display:block;opacity:0.6;}
+  .danger-link:hover{opacity:1;color:var(--danger);}
 
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;}
@@ -224,7 +227,6 @@
       <div class="actions-row">
         <button class="btn btn-secondary btn-sm" id="exportXlsxBtn">Export .xlsx</button>
         <button class="btn btn-secondary btn-sm" id="exportCsvBtn">Export .csv</button>
-        <button class="btn btn-danger btn-sm" id="clearAllBtn">Clear All</button>
       </div>
     </div>
     <div class="toolbar">
@@ -251,6 +253,7 @@
     </table>
     </div>
     <div class="empty" id="emptyMsg" style="display:none;">No entries yet — add your first one above.</div>
+    <button class="danger-link" id="clearAllBtn">Clear all records (admin)</button>
   </div>
 
 </div>
@@ -398,7 +401,6 @@
       <div class="actions-row">
         <button class="btn btn-secondary btn-sm" id="vExportXlsxBtn">Export .xlsx</button>
         <button class="btn btn-secondary btn-sm" id="vExportCsvBtn">Export .csv</button>
-        <button class="btn btn-danger btn-sm" id="vClearAllBtn">Clear All</button>
       </div>
     </div>
     <div class="toolbar">
@@ -424,6 +426,7 @@
       </table>
     </div>
     <div class="empty" id="vEmptyMsg" style="display:none;">No volunteer entries yet — add the first one above.</div>
+    <button class="danger-link" id="vClearAllBtn">Clear all records (admin)</button>
   </div>
 
   <div class="card">
