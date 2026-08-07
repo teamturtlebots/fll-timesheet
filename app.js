@@ -21,6 +21,11 @@ let editingId = null;
 let sortKey = 'date';
 let sortDir = 'desc';
 
+let volunteerEntries = [];
+let vEditingId = null;
+let vSortKey = 'date';
+let vSortDir = 'desc';
+
 // ---------- Elements: single entry form ----------
 const form = document.getElementById('entryForm');
 const fName = document.getElementById('fName');
@@ -61,9 +66,29 @@ const cumulativeChart = document.getElementById('cumulativeChart');
 const cumulativeBody = document.getElementById('cumulativeBody');
 
 // defaults
+// ---------- Elements: volunteers ----------
+const volunteerForm = document.getElementById('volunteerForm');
+const vDate = document.getElementById('vDate');
+const vVolunteer = document.getElementById('vVolunteer');
+const vBegin = document.getElementById('vBegin');
+const vEnd = document.getElementById('vEnd');
+const vHours = document.getElementById('vHours');
+const vDescription = document.getElementById('vDescription');
+const volunteerList = document.getElementById('volunteerList');
+const vSubmitBtn = document.getElementById('vSubmitBtn');
+const vCancelEditBtn = document.getElementById('vCancelEditBtn');
+const volunteerEntriesBody = document.getElementById('volunteerEntriesBody');
+const vEmptyMsg = document.getElementById('vEmptyMsg');
+const vFilterVolunteer = document.getElementById('vFilterVolunteer');
+const vFilterMonth = document.getElementById('vFilterMonth');
+const volunteerMonthlyHead = document.getElementById('volunteerMonthlyHead');
+const volunteerMonthlyBody = document.getElementById('volunteerMonthlyBody');
+const vMonthlyEmpty = document.getElementById('vMonthlyEmpty');
+
 const todayStr = new Date().toISOString().slice(0, 10);
 fDate.value = todayStr;
 mDate.value = todayStr;
+vDate.value = todayStr;
 
 function refreshWeekDisplays() {
   fWeek.value = computeWeek(fDate.value);
@@ -72,6 +97,22 @@ function refreshWeekDisplays() {
 fDate.addEventListener('input', refreshWeekDisplays);
 mDate.addEventListener('input', refreshWeekDisplays);
 refreshWeekDisplays();
+
+function computeHoursFromTimes(begin, end) {
+  if (!begin || !end) return null;
+  const [bh, bm] = begin.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let startMinutes = bh * 60 + bm;
+  let endMinutes = eh * 60 + em;
+  if (endMinutes < startMinutes) endMinutes += 24 * 60; // crosses midnight
+  return Math.round(((endMinutes - startMinutes) / 60) * 100) / 100;
+}
+function refreshVHours() {
+  const h = computeHoursFromTimes(vBegin.value, vEnd.value);
+  vHours.value = h === null ? '' : h;
+}
+vBegin.addEventListener('input', refreshVHours);
+vEnd.addEventListener('input', refreshVHours);
 
 // ---------- Helpers ----------
 function toast(msg) {
@@ -112,6 +153,11 @@ db.collection('meta').doc('roster').onSnapshot(doc => {
   }
   renderMatrix();
   render();
+}, err => toast('Sync error: ' + err.message));
+
+db.collection('volunteerEntries').onSnapshot(snapshot => {
+  volunteerEntries = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderVolunteers();
 }, err => toast('Sync error: ' + err.message));
 
 // ---------- Top-level tabs (Entry / Summary) ----------
@@ -579,6 +625,248 @@ document.getElementById('exportCsvBtn').addEventListener('click', () => {
   toast('Exported .csv');
 });
 
+// ---------- Volunteer time tracking ----------
+function fmtTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+function fmtHours(h) {
+  return String(Math.round(Number(h) * 100) / 100);
+}
+function monthKey(dateStr) {
+  return dateStr ? dateStr.slice(0, 7) : ''; // YYYY-MM
+}
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+}
+
+volunteerForm.addEventListener('submit', ev => {
+  ev.preventDefault();
+  const hours = computeHoursFromTimes(vBegin.value, vEnd.value);
+  const entry = {
+    date: vDate.value,
+    beginTime: vBegin.value,
+    endTime: vEnd.value,
+    hours,
+    volunteer: vVolunteer.value.trim(),
+    description: vDescription.value.trim()
+  };
+  if (!entry.date || !entry.volunteer || !entry.beginTime || !entry.endTime || hours === null) {
+    toast('Fill in date, times, and name');
+    return;
+  }
+
+  const savePromise = vEditingId
+    ? db.collection('volunteerEntries').doc(vEditingId).set(entry)
+    : db.collection('volunteerEntries').add(entry);
+
+  savePromise
+    .then(() => {
+      toast(vEditingId ? 'Volunteer entry updated' : 'Volunteer entry added');
+      resetVolunteerForm();
+    })
+    .catch(err => toast('Error: ' + err.message));
+});
+
+function startVolunteerEdit(id) {
+  const e = volunteerEntries.find(x => x.id === id);
+  if (!e) return;
+  vEditingId = id;
+  vDate.value = e.date;
+  vBegin.value = e.beginTime;
+  vEnd.value = e.endTime;
+  refreshVHours();
+  vVolunteer.value = e.volunteer;
+  vDescription.value = e.description || '';
+  vSubmitBtn.textContent = 'Save Changes';
+  vCancelEditBtn.style.display = 'inline-block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+window.startVolunteerEdit = startVolunteerEdit;
+
+function deleteVolunteerEntry(id) {
+  if (!confirm('Delete this volunteer entry?')) return;
+  db.collection('volunteerEntries').doc(id).delete()
+    .then(() => toast('Entry deleted'))
+    .catch(err => toast('Error: ' + err.message));
+}
+window.deleteVolunteerEntry = deleteVolunteerEntry;
+
+function resetVolunteerForm() {
+  vEditingId = null;
+  volunteerForm.reset();
+  vDate.value = new Date().toISOString().slice(0, 10);
+  vHours.value = '';
+  vSubmitBtn.textContent = 'Add Entry';
+  vCancelEditBtn.style.display = 'none';
+}
+vCancelEditBtn.addEventListener('click', resetVolunteerForm);
+
+document.getElementById('vClearAllBtn').addEventListener('click', () => {
+  if (!confirm('Delete ALL volunteer entries for everyone? This cannot be undone.')) return;
+  db.collection('volunteerEntries').get().then(snapshot => {
+    const batch = db.batch();
+    snapshot.docs.forEach(d => batch.delete(d.ref));
+    return batch.commit();
+  })
+    .then(() => toast('All volunteer entries cleared'))
+    .catch(err => toast('Error: ' + err.message));
+});
+
+function renderVolunteers() {
+  const names = [...new Set(volunteerEntries.map(e => e.volunteer))].sort();
+  volunteerList.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
+
+  const curVolFilter = vFilterVolunteer.value;
+  vFilterVolunteer.innerHTML = '<option value="">All volunteers</option>' +
+    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  vFilterVolunteer.value = curVolFilter;
+
+  const months = [...new Set(volunteerEntries.map(e => monthKey(e.date)))].filter(Boolean).sort();
+  const curMonthFilter = vFilterMonth.value;
+  vFilterMonth.innerHTML = '<option value="">All months</option>' +
+    months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+  vFilterMonth.value = curMonthFilter;
+
+  let rows = volunteerEntries.filter(e => {
+    if (vFilterVolunteer.value && e.volunteer !== vFilterVolunteer.value) return false;
+    if (vFilterMonth.value && monthKey(e.date) !== vFilterMonth.value) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    let av = a[vSortKey], bv = b[vSortKey];
+    if (vSortKey === 'hours') { av = Number(av); bv = Number(bv); }
+    if (av < bv) return vSortDir === 'asc' ? -1 : 1;
+    if (av > bv) return vSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  volunteerEntriesBody.innerHTML = rows.map(e => `
+    <tr>
+      <td>${fmtDate(e.date)}</td>
+      <td>${fmtTime(e.beginTime)}</td>
+      <td>${fmtTime(e.endTime)}</td>
+      <td>${fmtHours(e.hours)}</td>
+      <td>${escapeHtml(e.volunteer)}</td>
+      <td>${escapeHtml(e.description || '')}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-secondary btn-sm" onclick="startVolunteerEdit('${e.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteVolunteerEntry('${e.id}')">Del</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  vEmptyMsg.style.display = rows.length === 0 ? 'block' : 'none';
+
+  renderVolunteerMonthly(volunteerEntries);
+}
+
+function renderVolunteerMonthly(rows) {
+  const months = [...new Set(rows.map(e => monthKey(e.date)))].filter(Boolean).sort();
+  const volunteers = [...new Set(rows.map(e => e.volunteer))].sort();
+
+  if (!months.length || !volunteers.length) {
+    volunteerMonthlyHead.innerHTML = '';
+    volunteerMonthlyBody.innerHTML = '';
+    vMonthlyEmpty.style.display = 'block';
+    return;
+  }
+  vMonthlyEmpty.style.display = 'none';
+
+  const totals = {};
+  volunteers.forEach(v => { totals[v] = { total: 0 }; months.forEach(m => totals[v][m] = 0); });
+  rows.forEach(e => {
+    const mk = monthKey(e.date);
+    if (!mk || !totals[e.volunteer]) return;
+    totals[e.volunteer][mk] = (totals[e.volunteer][mk] || 0) + Number(e.hours);
+    totals[e.volunteer].total += Number(e.hours);
+  });
+
+  volunteerMonthlyHead.innerHTML = `<tr><th>Volunteer</th>${months.map(m => `<th>${monthLabel(m)}</th>`).join('')}<th>Total</th></tr>`;
+
+  const monthTotals = {};
+  months.forEach(m => monthTotals[m] = 0);
+  let grandTotal = 0;
+
+  const bodyRows = volunteers.map(v => {
+    const cells = months.map(m => {
+      const h = totals[v][m];
+      monthTotals[m] += h;
+      return `<td>${h > 0 ? fmtHours(h) : '—'}</td>`;
+    }).join('');
+    grandTotal += totals[v].total;
+    return `<tr><td>${escapeHtml(v)}</td>${cells}<td><b>${fmtHours(totals[v].total)}</b></td></tr>`;
+  }).join('');
+
+  const totalRow = `<tr style="font-weight:700;border-top:2px solid var(--border);">
+    <td>Total</td>${months.map(m => `<td>${fmtHours(monthTotals[m])}</td>`).join('')}<td>${fmtHours(grandTotal)}</td>
+  </tr>`;
+
+  volunteerMonthlyBody.innerHTML = bodyRows + totalRow;
+}
+
+[vFilterVolunteer, vFilterMonth].forEach(el => el.addEventListener('input', renderVolunteers));
+
+document.querySelectorAll('th[data-vsort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.vsort;
+    if (vSortKey === key) vSortDir = vSortDir === 'asc' ? 'desc' : 'asc';
+    else { vSortKey = key; vSortDir = 'asc'; }
+    renderVolunteers();
+  });
+});
+
+function getVolunteerExportRows() {
+  const rows = [...volunteerEntries].sort((a, b) => a.date.localeCompare(b.date));
+  return rows.map(e => ({
+    Date: fmtDate(e.date),
+    'Begin Time': fmtTime(e.beginTime),
+    'End Time': fmtTime(e.endTime),
+    Hours: Number(e.hours),
+    Volunteer: e.volunteer,
+    Description: e.description || ''
+  }));
+}
+
+document.getElementById('vExportXlsxBtn').addEventListener('click', () => {
+  if (typeof XLSX === 'undefined') { toast('Export library not loaded — check connection'); return; }
+  const rows = getVolunteerExportRows();
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 8 }, { wch: 16 }, { wch: 40 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Volunteer Hours');
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `volunteer-hours-${stamp}.xlsx`);
+  toast('Exported .xlsx');
+});
+
+document.getElementById('vExportCsvBtn').addEventListener('click', () => {
+  const rows = getVolunteerExportRows();
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.join(','),
+    ...rows.map(r => headers.map(h => `"${String(r[h]).replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `volunteer-hours-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Exported .csv');
+});
+
 // ---------- Service worker ----------
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -592,3 +880,4 @@ window.deleteEntry = deleteEntry;
 // ---------- Init ----------
 renderMatrix();
 render();
+renderVolunteers();

@@ -119,6 +119,7 @@
 <nav class="maintabs">
   <div class="maintab active" data-maintab="summary">📊 Summary</div>
   <div class="maintab" data-maintab="entry">📝 Entry</div>
+  <div class="maintab" data-maintab="volunteers">🙋 Volunteers</div>
 </nav>
 
 <main>
@@ -289,6 +290,91 @@
         </table>
       </div>
     </div>
+  </div>
+
+</div>
+
+<!-- ============ VOLUNTEERS PANEL ============ -->
+<div class="mainpanel" id="panel-volunteers">
+
+  <div class="card">
+    <h2>Log Volunteer Time</h2>
+    <form id="volunteerForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <label for="vDate">Date</label>
+        <input type="date" id="vDate" required>
+      </div>
+      <div>
+        <label for="vVolunteer">Volunteer Name</label>
+        <input list="volunteerList" id="vVolunteer" required placeholder="e.g. Liang Xue">
+        <datalist id="volunteerList"></datalist>
+      </div>
+      <div>
+        <label for="vBegin">Begin Time</label>
+        <input type="time" id="vBegin" required>
+      </div>
+      <div>
+        <label for="vEnd">End Time</label>
+        <input type="time" id="vEnd" required>
+      </div>
+      <div class="full" style="grid-column:1/-1;">
+        <label for="vHours">Hours (auto-calculated)</label>
+        <input type="text" id="vHours" readonly placeholder="fill in times above">
+      </div>
+      <div class="full" style="grid-column:1/-1;">
+        <label for="vDescription">Description</label>
+        <textarea id="vDescription" placeholder="e.g. FLL class, guide team build mission models"></textarea>
+      </div>
+      <div class="full" style="grid-column:1/-1;">
+        <button type="submit" class="btn btn-primary" id="vSubmitBtn">Add Entry</button>
+        <button type="button" class="btn btn-secondary" id="vCancelEditBtn" style="display:none;">Cancel Edit</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Volunteer Entries</h2>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="vExportXlsxBtn">Export .xlsx</button>
+        <button class="btn btn-secondary btn-sm" id="vExportCsvBtn">Export .csv</button>
+        <button class="btn btn-danger btn-sm" id="vClearAllBtn">Clear All</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="vFilterVolunteer"><option value="">All volunteers</option></select>
+        <select id="vFilterMonth"><option value="">All months</option></select>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="entries">
+        <thead>
+          <tr>
+            <th data-vsort="date">Date</th>
+            <th data-vsort="beginTime">Begin</th>
+            <th data-vsort="endTime">End</th>
+            <th data-vsort="hours">Hours</th>
+            <th data-vsort="volunteer">Volunteer</th>
+            <th data-vsort="description">Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="volunteerEntriesBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="vEmptyMsg" style="display:none;">No volunteer entries yet — add the first one above.</div>
+  </div>
+
+  <div class="card">
+    <h2>Monthly Summary by Person</h2>
+    <div style="overflow-x:auto;">
+      <table class="entries weeklytable" id="volunteerMonthlyTable">
+        <thead id="volunteerMonthlyHead"></thead>
+        <tbody id="volunteerMonthlyBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="vMonthlyEmpty" style="display:none;">No data yet.</div>
   </div>
 
 </div>
