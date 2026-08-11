@@ -104,7 +104,14 @@ const vCopyLastBtn = document.getElementById('vCopyLastBtn');
 const vCommitMatrixBtn = document.getElementById('vCommitMatrixBtn');
 const vClearMatrixBtn = document.getElementById('vClearMatrixBtn');
 
-const todayStr = new Date().toISOString().slice(0, 10);
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const todayStr = localDateStr();
 fDate.value = todayStr;
 mDate.value = todayStr;
 vDate.value = todayStr;
@@ -650,7 +657,7 @@ function deleteEntry(id) {
 function resetForm() {
   editingId = null;
   form.reset();
-  fDate.value = new Date().toISOString().slice(0, 10);
+  fDate.value = localDateStr();
   submitBtn.textContent = 'Add Entry';
   cancelEditBtn.style.display = 'none';
 }
@@ -863,7 +870,7 @@ window.deleteVolunteerEntry = deleteVolunteerEntry;
 function resetVolunteerForm() {
   vEditingId = null;
   volunteerForm.reset();
-  vDate.value = new Date().toISOString().slice(0, 10);
+  vDate.value = localDateStr();
   vHours.value = '';
   vSubmitBtn.textContent = 'Add Entry';
   vCancelEditBtn.style.display = 'none';
