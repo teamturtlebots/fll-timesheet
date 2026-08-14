@@ -63,8 +63,6 @@ const mDate = document.getElementById('mDate');
 const mWeek = document.getElementById('mWeek');
 const mComments = document.getElementById('mComments');
 const matrixBody = document.getElementById('matrixBody');
-const newRowName = document.getElementById('newRowName');
-const addRowBtn = document.getElementById('addRowBtn');
 const commitMatrixBtn = document.getElementById('commitMatrixBtn');
 const clearMatrixBtn = document.getElementById('clearMatrixBtn');
 
@@ -75,6 +73,11 @@ const activityPie = document.getElementById('activityPie');
 const weeklyChart = document.getElementById('weeklyChart');
 const cumulativeChart = document.getElementById('cumulativeChart');
 const cumulativeBody = document.getElementById('cumulativeBody');
+const summaryRangeButtons = document.getElementById('summaryRangeButtons');
+const summaryCustomRange = document.getElementById('summaryCustomRange');
+const summaryRangeStart = document.getElementById('summaryRangeStart');
+const summaryRangeEnd = document.getElementById('summaryRangeEnd');
+const summaryRangeLabel = document.getElementById('summaryRangeLabel');
 
 // defaults
 // ---------- Elements: volunteers ----------
@@ -293,27 +296,9 @@ function renderMatrix() {
       <td class="namecell">${escapeHtml(name)}</td>
       ${ACTIVITIES.map(a => `<td><input type="number" class="hourcell" step="0.25" min="0" data-activity="${a}" placeholder="0"></td>`).join('')}
       <td><input type="text" class="commentcell" placeholder="optional"></td>
-      <td class="rmcell"><button class="btn btn-danger btn-sm" onclick="removeRosterRow('${escapeHtml(name)}')">✕</button></td>
     </tr>
   `).join('');
 }
-
-function removeRosterRow(name) {
-  const updated = roster.filter(n => n !== name);
-  db.collection('meta').doc('roster').set({ names: updated }).catch(err => toast('Error: ' + err.message));
-}
-window.removeRosterRow = removeRosterRow;
-
-addRowBtn.addEventListener('click', () => {
-  const name = newRowName.value.trim();
-  if (!name) return;
-  if (roster.includes(name)) { toast('Already in the list'); return; }
-  const updated = [...roster, name];
-  db.collection('meta').doc('roster').set({ names: updated })
-    .then(() => { newRowName.value = ''; })
-    .catch(err => toast('Error: ' + err.message));
-});
-newRowName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addRowBtn.click(); } });
 
 clearMatrixBtn.addEventListener('click', () => {
   matrixBody.querySelectorAll('input.hourcell').forEach(inp => inp.value = '');
@@ -360,6 +345,61 @@ commitMatrixBtn.addEventListener('click', () => {
     })
     .catch(err => toast('Error: ' + err.message));
 });
+
+// ---------- Summary date-range filter (Hours by Member / Hours by Activity only) ----------
+let summaryRange = '7D';
+
+function getSummaryFilteredRows() {
+  if (summaryRange === 'lifetime') return entries;
+
+  if (summaryRange === 'custom') {
+    const start = summaryRangeStart.value;
+    const end = summaryRangeEnd.value;
+    if (!start && !end) return entries;
+    return entries.filter(e => {
+      if (start && e.date < start) return false;
+      if (end && e.date > end) return false;
+      return true;
+    });
+  }
+
+  const days = summaryRange === '1D' ? 1 : summaryRange === '3D' ? 3 : 7;
+  const end = localDateStr();
+  const startDate = new Date(end + 'T00:00:00');
+  startDate.setDate(startDate.getDate() - (days - 1));
+  const start = localDateStr(startDate);
+  return entries.filter(e => e.date >= start && e.date <= end);
+}
+
+function summaryRangeLabelText() {
+  if (summaryRange === 'lifetime') return '(lifetime)';
+  if (summaryRange === 'custom') {
+    const start = summaryRangeStart.value;
+    const end = summaryRangeEnd.value;
+    if (!start && !end) return '(custom — pick dates)';
+    return `(${start ? fmtDate(start) : '…'} – ${end ? fmtDate(end) : '…'})`;
+  }
+  return `(last ${summaryRange})`;
+}
+
+function renderSummaryFiltered() {
+  const rows = getSummaryFilteredRows();
+  summaryRangeLabel.textContent = summaryRangeLabelText();
+  renderMemberBars(rows);
+  renderActivityPie(rows);
+}
+
+summaryRangeButtons.querySelectorAll('.vmtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    summaryRangeButtons.querySelectorAll('.vmtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    summaryRange = btn.dataset.range;
+    summaryCustomRange.style.display = summaryRange === 'custom' ? 'grid' : 'none';
+    renderSummaryFiltered();
+  });
+});
+summaryRangeStart.addEventListener('input', renderSummaryFiltered);
+summaryRangeEnd.addEventListener('input', renderSummaryFiltered);
 
 // ---------- Render entries table ----------
 function render() {
@@ -412,8 +452,7 @@ function render() {
 
   emptyMsg.style.display = rows.length === 0 ? 'block' : 'none';
   renderStats(entries);
-  renderMemberBars(entries);
-  renderActivityPie(entries);
+  renderSummaryFiltered();
   renderWeeklyChart(entries);
   statusEl.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · synced live`;
 }

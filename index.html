@@ -66,10 +66,7 @@
   table.matrix th{color:var(--muted);font-size:11px;text-transform:uppercase;background:var(--panel2);}
   table.matrix td.namecell{text-align:left;font-weight:600;background:var(--panel2);white-space:nowrap;}
   table.matrix input.hourcell{width:64px;text-align:center;padding:6px 4px;}
-  table.matrix td.rmcell{border:none;padding:2px;}
   .matrix-wrap{overflow-x:auto;}
-  .addrow-bar{display:flex;gap:8px;margin-top:10px;}
-  .addrow-bar input{flex:1;}
 
   .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
   .hint code{background:var(--panel2);padding:1px 5px;border-radius:4px;}
@@ -162,15 +159,10 @@
               <th>Project</th>
               <th>Community</th>
               <th style="text-align:left;">Comments</th>
-              <th></th>
             </tr>
           </thead>
           <tbody id="matrixBody"></tbody>
         </table>
-      </div>
-      <div class="addrow-bar">
-        <input type="text" id="newRowName" placeholder="Add person…">
-        <button class="btn btn-secondary btn-sm" id="addRowBtn">Add Row</button>
       </div>
 
       <div style="margin-top:12px;">
@@ -268,8 +260,28 @@
     <h2>Summary</h2>
     <div class="stats-grid" id="statsGrid"></div>
 
+    <div class="toolbar" style="margin-top:4px;">
+      <div class="filters" id="summaryRangeButtons">
+        <div class="vmtab" data-range="1D">1D</div>
+        <div class="vmtab" data-range="3D">3D</div>
+        <div class="vmtab active" data-range="7D">7D</div>
+        <div class="vmtab" data-range="lifetime">Lifetime</div>
+        <div class="vmtab" data-range="custom">Custom</div>
+      </div>
+    </div>
+    <div class="meta-row" id="summaryCustomRange" style="display:none;margin-top:8px;">
+      <div>
+        <label for="summaryRangeStart">Start date</label>
+        <input type="date" id="summaryRangeStart">
+      </div>
+      <div>
+        <label for="summaryRangeEnd">End date</label>
+        <input type="date" id="summaryRangeEnd">
+      </div>
+    </div>
+
     <div class="summary-sub">
-      <h3>Hours by Member</h3>
+      <h3>Hours by Member <span id="summaryRangeLabel" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400;"></span></h3>
       <div class="legend-row" id="memberLegend"></div>
       <div id="memberBars"></div>
     </div>
