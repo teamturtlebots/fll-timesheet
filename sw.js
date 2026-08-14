@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hourtrack-cache-v16';
+const CACHE_NAME = 'hourtrack-cache-v17';
 const ASSETS = [
   './',
   './index.html',
@@ -26,18 +26,24 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Network-first, falling back to cache when offline. This makes sure a
+// connected device always gets the latest app files instead of whatever
+// happened to be cached the first time it was opened; the cache only kicks
+// in when there's no network (e.g. mid-competition wifi dead zone).
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // cache same-origin GET responses for future offline use
-        if (event.request.method === 'GET' && response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
-    })
+    fetch(event.request).then(response => {
+      if (response.ok) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      }
+      return response;
+    }).catch(() => caches.match(event.request))
   );
+});
+
+// Lets the page force this worker to take over immediately (see app.js).
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
 });

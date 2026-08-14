@@ -1166,9 +1166,28 @@ document.getElementById('vExportCsvBtn').addEventListener('click', () => {
 });
 
 // ---------- Service worker ----------
+// Beyond just registering, this actively checks for a newer sw.js/app version
+// (on load, whenever the app is brought to the foreground, and periodically
+// while left open) and reloads automatically once a new version takes over —
+// important for the iPhone home-screen install, which is its own separate
+// cache from the browser and won't otherwise notice updates on its own.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      const checkForUpdate = () => reg.update().catch(() => {});
+      checkForUpdate();
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkForUpdate();
+      });
+      setInterval(checkForUpdate, 30 * 60 * 1000); // every 30 min while app stays open
+    }).catch(err => console.warn('SW registration failed', err));
+
+    let reloadedForUpdate = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloadedForUpdate) return;
+      reloadedForUpdate = true;
+      window.location.reload();
+    });
   });
 }
 
