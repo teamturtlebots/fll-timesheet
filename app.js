@@ -1,6 +1,6 @@
 // ---------- Firebase (shared cloud storage, no login) ----------
 const DEFAULT_ROSTER = ['Evan', 'Mason', 'Ellen', 'Eric', 'Stanley', 'Anya', 'Aiden'];
-const VOLUNTEER_ROSTER = ['Liang Xue', 'Sheng Yin', 'Bin Lu'];
+const VOLUNTEER_ROSTER = ['Liang Xue', 'Sheng Yin'];
 
 // Change this to whatever you want — only people who know it can bulk-delete records.
 const ADMIN_PASSCODE = 'ttb';
@@ -172,7 +172,36 @@ function renderVolunteerMatrix() {
 vClearMatrixBtn.addEventListener('click', () => {
   volunteerMatrixBody.querySelectorAll('.vm-begin, .vm-end, .vm-desc, .vm-hours').forEach(inp => inp.value = '');
   vmComments.value = '';
+  clearVolunteerQuickfillRow();
 });
+
+// ---------- Quick fill (type once, applies to every volunteer's row live) ----------
+function clearVolunteerQuickfillRow() {
+  document.querySelectorAll('#volunteerMatrixTable .fillcell').forEach(inp => inp.value = '');
+}
+
+function fillVolunteerColumn(selector, value) {
+  volunteerMatrixBody.querySelectorAll(selector).forEach(inp => inp.value = value);
+  // Recompute each row's Hours since Begin/End may have just changed.
+  volunteerMatrixBody.querySelectorAll('tr').forEach(tr => {
+    const begin = tr.querySelector('.vm-begin');
+    const end = tr.querySelector('.vm-end');
+    const hoursField = tr.querySelector('.vm-hours');
+    const h = computeHoursFromTimes(begin.value, end.value);
+    hoursField.value = h === null ? '' : h;
+  });
+}
+
+const vFillBegin = document.getElementById('vFillBegin');
+const vFillEnd = document.getElementById('vFillEnd');
+const vFillDesc = document.getElementById('vFillDesc');
+if (vFillBegin) vFillBegin.addEventListener('input', () => fillVolunteerColumn('.vm-begin', vFillBegin.value));
+if (vFillEnd) vFillEnd.addEventListener('input', () => fillVolunteerColumn('.vm-end', vFillEnd.value));
+if (vFillDesc) {
+  vFillDesc.addEventListener('input', () => {
+    volunteerMatrixBody.querySelectorAll('.vm-desc').forEach(inp => inp.value = vFillDesc.value);
+  });
+}
 
 vCopyLastBtn.addEventListener('click', () => {
   let copied = 0;
@@ -216,6 +245,7 @@ vCommitMatrixBtn.addEventListener('click', () => {
   batch.commit()
     .then(() => {
       volunteerMatrixBody.querySelectorAll('.vm-begin, .vm-end, .vm-desc, .vm-hours').forEach(inp => inp.value = '');
+      clearVolunteerQuickfillRow();
       vmComments.value = '';
       toast(`Added ${newEntries.length} entr${newEntries.length === 1 ? 'y' : 'ies'}`);
     })
