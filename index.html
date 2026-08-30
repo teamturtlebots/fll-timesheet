@@ -512,10 +512,12 @@
       <label for="letterOpeningNote">Opening note (optional — an award, highlight, etc.)</label>
       <textarea id="letterOpeningNote" style="min-height:70px;" placeholder="e.g. We got the World Engineering Excellence award, and we won't be here without your coaching and help!"></textarea>
     </div>
-    <p class="hint">Letter date and hours table use today's date and the Volunteer/Month filters currently selected above.</p>
+    <p class="hint">A print window opens using today's date and the Volunteer/Month filters currently
+      selected above — choose <b>Save as PDF</b> as the destination in the print dialog (on mobile,
+      look for a similar "Save as PDF" or "Export PDF" option in the share sheet).</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="letterCancelBtn">Cancel</button>
-      <button class="btn btn-primary" id="letterGenerateBtn">Generate PDF</button>
+      <button class="btn btn-primary" id="letterGenerateBtn">Open Print Dialog</button>
     </div>
   </div>
 </div>
@@ -524,7 +526,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -33,8 +33,9 @@ that day comes.
 
 ## Volunteer acknowledgement letters
 On the **Volunteers** tab, pick a specific volunteer and month in the filters above the entries table, then
-click **📄 Generate Letter**. It builds a one-page PDF (org logos, date, hours table, boilerplate) and
-downloads it — no need to screenshot the table into a doc by hand anymore.
+click **📄 Generate Letter**. It opens a print-preview window (org logos, date, hours table, boilerplate) —
+choose **Save as PDF** as the destination in the print dialog to get the file (on mobile, look for a similar
+option in the share sheet).
 - The org name, EIN, address, contact emails, team name, and who signs the letter are all set in
   `LETTER_CONFIG` near the top of `app.js` — edit those once for your org.
 - Each time you generate a letter you can edit the greeting line (e.g. "Dear Mr. ...") and add an optional

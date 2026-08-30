@@ -1225,8 +1225,6 @@ letterModalOverlay.addEventListener('click', ev => {
 });
 
 letterGenerateBtn.addEventListener('click', () => {
-  if (typeof html2pdf === 'undefined') { toast('PDF library not loaded — check connection'); return; }
-
   const volunteerName = vFilterVolunteer.value;
   const monthText = monthLabel(vFilterMonth.value);
   const rows = [...vLastFilteredRows].sort((a, b) => a.date.localeCompare(b.date));
@@ -1235,14 +1233,14 @@ letterGenerateBtn.addEventListener('click', () => {
   const openingNote = letterOpeningNote.value.trim();
   const dateStr = formatLetterDate(new Date());
   const c = LETTER_CONFIG;
+  const logoLeftUrl = new URL(c.logoLeft, window.location.href).href;
+  const logoRightUrl = new URL(c.logoRight, window.location.href).href;
 
-  const el = document.createElement('div');
-  el.style.cssText = 'position:absolute; top:0; left:0; z-index:-1; opacity:0.01; pointer-events:none; width:750px; background:#fff; color:#1a1a1a; font-family: Arial, Helvetica, sans-serif; padding:24px; font-size:13px;';
-  el.innerHTML = `
+  const letterBodyHtml = `
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px;">
-      <img src="${c.logoLeft}" style="height:64px;">
+      <img src="${logoLeftUrl}" style="height:64px;">
       <div style="text-align:center;">
-        <img src="${c.logoRight}" style="height:64px; display:block; margin:0 auto;">
+        <img src="${logoRightUrl}" style="height:64px; display:block; margin:0 auto;">
         <div style="color:#2a9d6f; font-weight:bold; font-size:14px; margin-top:2px;">${escapeHtml(c.teamName)}</div>
       </div>
     </div>
@@ -1265,7 +1263,7 @@ letterGenerateBtn.addEventListener('click', () => {
       </thead>
       <tbody>
         ${rows.map((r, i) => `
-          <tr style="background:${i % 2 ? '#f4f6fa' : '#ffffff'}; page-break-inside:avoid;">
+          <tr style="background:${i % 2 ? '#f4f6fa' : '#ffffff'};">
             <td style="padding:6px 8px; border:1px solid #ddd;">${fmtDate(r.date)}</td>
             <td style="padding:6px 8px; border:1px solid #ddd;">${fmtTime(r.beginTime)}</td>
             <td style="padding:6px 8px; border:1px solid #ddd;">${fmtTime(r.endTime)}</td>
@@ -1292,37 +1290,36 @@ letterGenerateBtn.addEventListener('click', () => {
       ${c.orgEmails.map(escapeHtml).join('<br>')}
     </div>
   `;
-  document.body.appendChild(el);
 
-  const fileSafe = s => String(s).replace(/[^a-z0-9]+/gi, '');
-  const filename = `Acknowledgement-${fileSafe(volunteerName)}-${fileSafe(monthText)}.pdf`;
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Acknowledgement - ${escapeHtml(volunteerName)} - ${escapeHtml(monthText)}</title>
+    <style>
+      @page { size: letter; margin: 0.5in; }
+      body { margin:0; font-family: Arial, Helvetica, sans-serif; color:#1a1a1a; font-size:13px; }
+    </style>
+  </head><body>${letterBodyHtml}</body></html>`;
 
-  // Make sure both logo images have actually finished loading before html2canvas
-  // takes its snapshot — otherwise they (and sometimes the whole capture) come out blank.
-  const waitForImages = container => Promise.all(
-    Array.from(container.querySelectorAll('img')).map(img => {
-      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-      return new Promise(resolve => {
-        img.addEventListener('load', resolve, { once: true });
-        img.addEventListener('error', resolve, { once: true });
-      });
-    })
-  );
+  // Native browser print → "Save as PDF" instead of a canvas-screenshot library —
+  // far more reliable across browsers than trying to rasterize hidden/off-screen content.
+  const printWin = window.open('', '_blank', 'width=850,height=1100');
+  if (!printWin) { toast('Please allow pop-ups for this site, then try again'); return; }
+  printWin.document.open();
+  printWin.document.write(fullHtml);
+  printWin.document.close();
 
-  toast('Generating letter…');
-  waitForImages(el).then(() => html2pdf().set({
-    margin: 0.5,
-    filename,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-  }).from(el).save())
-    .then(() => {
-      toast('Letter downloaded');
-      letterModalOverlay.classList.remove('show');
-    })
-    .catch(err => toast('Error generating letter: ' + err.message))
-    .finally(() => el.remove());
+  const triggerPrint = () => { printWin.focus(); printWin.print(); };
+  printWin.onload = () => {
+    const imgs = Array.from(printWin.document.images);
+    if (!imgs.length) { triggerPrint(); return; }
+    let remaining = imgs.length;
+    const checkDone = () => { remaining -= 1; if (remaining <= 0) triggerPrint(); };
+    imgs.forEach(img => {
+      if (img.complete) checkDone();
+      else { img.addEventListener('load', checkDone, { once: true }); img.addEventListener('error', checkDone, { once: true }); }
+    });
+  };
+
+  letterModalOverlay.classList.remove('show');
 });
 
 function getVolunteerExportRows() {
