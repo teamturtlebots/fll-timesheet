@@ -1237,7 +1237,7 @@ letterGenerateBtn.addEventListener('click', () => {
   const c = LETTER_CONFIG;
 
   const el = document.createElement('div');
-  el.style.cssText = 'position:fixed; left:-9999px; top:0; width:750px; background:#fff; color:#1a1a1a; font-family: Arial, Helvetica, sans-serif; padding:24px; font-size:13px;';
+  el.style.cssText = 'position:absolute; top:0; left:0; z-index:-1; opacity:0.01; pointer-events:none; width:750px; background:#fff; color:#1a1a1a; font-family: Arial, Helvetica, sans-serif; padding:24px; font-size:13px;';
   el.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px;">
       <img src="${c.logoLeft}" style="height:64px;">
@@ -1297,14 +1297,26 @@ letterGenerateBtn.addEventListener('click', () => {
   const fileSafe = s => String(s).replace(/[^a-z0-9]+/gi, '');
   const filename = `Acknowledgement-${fileSafe(volunteerName)}-${fileSafe(monthText)}.pdf`;
 
+  // Make sure both logo images have actually finished loading before html2canvas
+  // takes its snapshot — otherwise they (and sometimes the whole capture) come out blank.
+  const waitForImages = container => Promise.all(
+    Array.from(container.querySelectorAll('img')).map(img => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise(resolve => {
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+      });
+    })
+  );
+
   toast('Generating letter…');
-  html2pdf().set({
+  waitForImages(el).then(() => html2pdf().set({
     margin: 0.5,
     filename,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
     jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-  }).from(el).save()
+  }).from(el).save())
     .then(() => {
       toast('Letter downloaded');
       letterModalOverlay.classList.remove('show');
