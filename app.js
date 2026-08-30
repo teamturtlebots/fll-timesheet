@@ -302,7 +302,32 @@ function renderMatrix() {
 
 clearMatrixBtn.addEventListener('click', () => {
   matrixBody.querySelectorAll('input.hourcell').forEach(inp => inp.value = '');
+  matrixBody.querySelectorAll('input.commentcell').forEach(inp => inp.value = '');
+  clearQuickfillRow();
 });
+
+// ---------- Quick fill (type once, applies to every student's row live) ----------
+function clearQuickfillRow() {
+  document.querySelectorAll('#matrixTable .fillcell').forEach(inp => inp.value = '');
+}
+
+document.querySelectorAll('#matrixTable .fillcell[data-activity]').forEach(fill => {
+  fill.addEventListener('input', () => {
+    const activity = fill.dataset.activity;
+    matrixBody.querySelectorAll(`input.hourcell[data-activity="${activity}"]`).forEach(inp => {
+      inp.value = fill.value;
+    });
+  });
+});
+
+const fillCommentEl = document.getElementById('fillComment');
+if (fillCommentEl) {
+  fillCommentEl.addEventListener('input', () => {
+    matrixBody.querySelectorAll('input.commentcell').forEach(inp => {
+      inp.value = fillCommentEl.value;
+    });
+  });
+}
 
 commitMatrixBtn.addEventListener('click', () => {
   const date = mDate.value;
@@ -340,6 +365,7 @@ commitMatrixBtn.addEventListener('click', () => {
     .then(() => {
       matrixBody.querySelectorAll('input.hourcell').forEach(inp => inp.value = '');
       matrixBody.querySelectorAll('input.commentcell').forEach(inp => inp.value = '');
+      clearQuickfillRow();
       mComments.value = '';
       toast(`Added ${newEntries.length} entr${newEntries.length === 1 ? 'y' : 'ies'}`);
     })

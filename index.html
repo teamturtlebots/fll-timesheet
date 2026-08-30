@@ -67,6 +67,10 @@
   table.matrix td.namecell{text-align:left;font-weight:600;background:var(--panel2);white-space:nowrap;}
   table.matrix input.hourcell{width:64px;text-align:center;padding:6px 4px;}
   .matrix-wrap{overflow-x:auto;}
+  tr.quickfill-row th{background:var(--panel2);padding:4px 6px;}
+  tr.quickfill-row input.fillcell{width:64px;text-align:center;padding:6px 4px;border-color:var(--accent);background:#1b2947;}
+  tr.quickfill-row input.fillcell::placeholder{color:var(--accent);}
+  tr.quickfill-row th:first-child{font-size:11px;text-transform:none;color:var(--accent);font-weight:600;text-align:left;}
 
   .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
   .hint code{background:var(--panel2);padding:1px 5px;border-radius:4px;}
@@ -159,6 +163,13 @@
               <th>Project</th>
               <th>Community</th>
               <th style="text-align:left;">Comments</th>
+            </tr>
+            <tr class="quickfill-row">
+              <th style="text-align:left;">Fill all ⬇</th>
+              <th><input type="number" class="hourcell fillcell" step="0.25" min="0" data-activity="Robot" placeholder="↓"></th>
+              <th><input type="number" class="hourcell fillcell" step="0.25" min="0" data-activity="Project" placeholder="↓"></th>
+              <th><input type="number" class="hourcell fillcell" step="0.25" min="0" data-activity="Community" placeholder="↓"></th>
+              <th><input type="text" class="commentcell fillcell" id="fillComment" placeholder="↓"></th>
             </tr>
           </thead>
           <tbody id="matrixBody"></tbody>
