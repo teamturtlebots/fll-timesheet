@@ -14,6 +14,19 @@ function requireAdminPasscode(actionLabel) {
 const ACTIVITIES = ['Robot', 'Project', 'Community'];
 const SEASON_START = new Date('2026-07-20T00:00:00'); // Week 1 = 7/20–7/26
 
+// ---------- Acknowledgement letter settings (edit these for your team/org) ----------
+const LETTER_CONFIG = {
+  orgName: 'Georgia Robotics Alliance, Inc.',
+  orgEIN: '20-5604200',
+  orgAddressLines: ['6125 Dodson Road', 'Fairburn, GA 30213'],
+  orgEmails: ['georgiaroboticsalliance@comcast.net', 'TeamTurtleBots@gmail.com'],
+  teamName: 'Team TurtleBots',
+  signerName: 'Jia Wang',
+  signerTitle: 'Team Director',
+  logoLeft: 'gra-logo.png',
+  logoRight: 'turtlebots-logo.png',
+};
+
 function computeWeek(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
@@ -36,6 +49,8 @@ let volunteerEntries = [];
 let vEditingId = null;
 let vSortKey = 'date';
 let vSortDir = 'desc';
+let vLastFilteredRows = [];
+let vLastFilteredTotal = 0;
 
 // ---------- Elements: single entry form ----------
 const form = document.getElementById('entryForm');
@@ -1055,6 +1070,8 @@ function renderVolunteers() {
   vFilteredTotal.textContent = rows.length
     ? `Total: ${fmtHours(filteredTotal)} hours (${filterLabel})`
     : 'Total: 0 hours';
+  vLastFilteredRows = rows;
+  vLastFilteredTotal = filteredTotal;
 
   renderVolunteerMonthly(volunteerEntries);
 }
@@ -1175,6 +1192,125 @@ document.querySelectorAll('th[data-vsort]').forEach(th => {
     else { vSortKey = key; vSortDir = 'asc'; }
     renderVolunteers();
   });
+});
+
+// ---------- Acknowledgement letter ----------
+function formatLetterDate(d) {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')} ${d.getFullYear()}`;
+}
+
+const letterModalOverlay = document.getElementById('letterModalOverlay');
+const letterModalMeta = document.getElementById('letterModalMeta');
+const letterGreeting = document.getElementById('letterGreeting');
+const letterOpeningNote = document.getElementById('letterOpeningNote');
+const letterCancelBtn = document.getElementById('letterCancelBtn');
+const letterGenerateBtn = document.getElementById('letterGenerateBtn');
+
+document.getElementById('vGenerateLetterBtn').addEventListener('click', () => {
+  if (!vFilterVolunteer.value) { toast('Pick a specific volunteer above first (not "All volunteers")'); return; }
+  if (!vFilterMonth.value) { toast('Pick a specific month above first (not "All months")'); return; }
+  if (!vLastFilteredRows.length) { toast('No entries for that volunteer/month'); return; }
+
+  letterModalMeta.textContent = `${vFilterVolunteer.value} · ${monthLabel(vFilterMonth.value)} · ${fmtHours(vLastFilteredTotal)} hours`;
+  letterGreeting.value = `Dear ${vFilterVolunteer.value},`;
+  letterOpeningNote.value = '';
+  letterModalOverlay.classList.add('show');
+});
+
+letterCancelBtn.addEventListener('click', () => letterModalOverlay.classList.remove('show'));
+letterModalOverlay.addEventListener('click', ev => {
+  if (ev.target === letterModalOverlay) letterModalOverlay.classList.remove('show');
+});
+
+letterGenerateBtn.addEventListener('click', () => {
+  if (typeof html2pdf === 'undefined') { toast('PDF library not loaded — check connection'); return; }
+
+  const volunteerName = vFilterVolunteer.value;
+  const monthText = monthLabel(vFilterMonth.value);
+  const rows = [...vLastFilteredRows].sort((a, b) => a.date.localeCompare(b.date));
+  const total = vLastFilteredTotal;
+  const greeting = letterGreeting.value.trim() || `Dear ${volunteerName},`;
+  const openingNote = letterOpeningNote.value.trim();
+  const dateStr = formatLetterDate(new Date());
+  const c = LETTER_CONFIG;
+
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed; left:-9999px; top:0; width:750px; background:#fff; color:#1a1a1a; font-family: Arial, Helvetica, sans-serif; padding:24px; font-size:13px;';
+  el.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px;">
+      <img src="${c.logoLeft}" style="height:64px;">
+      <div style="text-align:center;">
+        <img src="${c.logoRight}" style="height:64px; display:block; margin:0 auto;">
+        <div style="color:#2a9d6f; font-weight:bold; font-size:14px; margin-top:2px;">${escapeHtml(c.teamName)}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px;">${escapeHtml(dateStr)}</div>
+    <div style="margin-bottom:16px;">${escapeHtml(greeting)}</div>
+    ${openingNote ? `<div style="margin-bottom:16px; line-height:1.6;">${escapeHtml(openingNote)}</div>` : ''}
+    <div style="margin-bottom:16px; line-height:1.6;">
+      ${escapeHtml(c.teamName)} gratefully acknowledges your volunteer and mentoring contribution to the team.
+      The detailed hours for ${escapeHtml(monthText)} are listed below:
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:11.5px; margin-bottom:14px;">
+      <thead>
+        <tr style="background:#1e3a5f; color:#fff;">
+          <th style="padding:6px 8px; text-align:left; border:1px solid #1e3a5f;">Date</th>
+          <th style="padding:6px 8px; text-align:left; border:1px solid #1e3a5f;">Begin</th>
+          <th style="padding:6px 8px; text-align:left; border:1px solid #1e3a5f;">End</th>
+          <th style="padding:6px 8px; text-align:left; border:1px solid #1e3a5f;">Hours</th>
+          <th style="padding:6px 8px; text-align:left; border:1px solid #1e3a5f;">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r, i) => `
+          <tr style="background:${i % 2 ? '#f4f6fa' : '#ffffff'}; page-break-inside:avoid;">
+            <td style="padding:6px 8px; border:1px solid #ddd;">${fmtDate(r.date)}</td>
+            <td style="padding:6px 8px; border:1px solid #ddd;">${fmtTime(r.beginTime)}</td>
+            <td style="padding:6px 8px; border:1px solid #ddd;">${fmtTime(r.endTime)}</td>
+            <td style="padding:6px 8px; border:1px solid #ddd;">${fmtHours(r.hours)}</td>
+            <td style="padding:6px 8px; border:1px solid #ddd;">${escapeHtml(r.description || '')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div style="text-align:right; font-weight:bold; margin-bottom:22px;">Total: ${fmtHours(total)} hours</div>
+    <div style="margin-bottom:16px; line-height:1.6;">
+      ${escapeHtml(c.teamName)} is a member of ${escapeHtml(c.orgName)}, a 501(c3) organization dedicated to the advancement of STEM education.
+    </div>
+    <div style="margin-bottom:44px; line-height:1.6;">
+      Your support plays a pivotal role in advancing our mission to inspire and educate the next generation of innovators. Again, thank you for your generous support.
+    </div>
+    <div style="margin-bottom:4px;">Sincerely,</div>
+    <div style="font-weight:bold;">${escapeHtml(c.signerName)}</div>
+    <div style="margin-bottom:30px;">${escapeHtml(c.signerTitle)}</div>
+    <div style="padding-top:12px; border-top:1px solid #ccc; font-size:10px; color:#555; line-height:1.6;">
+      The ${escapeHtml(c.orgName)} is a 501(c)(3) organization under the U.S. Internal Revenue Code EIN # ${escapeHtml(c.orgEIN)}.<br><br>
+      <strong>Our Contact Information</strong><br>
+      ${c.orgAddressLines.map(escapeHtml).join('<br>')}<br>
+      ${c.orgEmails.map(escapeHtml).join('<br>')}
+    </div>
+  `;
+  document.body.appendChild(el);
+
+  const fileSafe = s => String(s).replace(/[^a-z0-9]+/gi, '');
+  const filename = `Acknowledgement-${fileSafe(volunteerName)}-${fileSafe(monthText)}.pdf`;
+
+  toast('Generating letter…');
+  html2pdf().set({
+    margin: 0.5,
+    filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  }).from(el).save()
+    .then(() => {
+      toast('Letter downloaded');
+      letterModalOverlay.classList.remove('show');
+    })
+    .catch(err => toast('Error generating letter: ' + err.message))
+    .finally(() => el.remove());
 });
 
 function getVolunteerExportRows() {

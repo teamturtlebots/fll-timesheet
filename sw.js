@@ -1,11 +1,14 @@
-const CACHE_NAME = 'hourtrack-cache-v18';
+const CACHE_NAME = 'hourtrack-cache-v19';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
   './manifest.json',
   './firebase-config.js',
+  './gra-logo.png',
+  './turtlebots-logo.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js'
 ];

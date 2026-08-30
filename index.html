@@ -113,6 +113,14 @@
     background:var(--panel2);border:1px solid var(--border);padding:10px 16px;border-radius:8px;
     font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;}
   #toast.show{opacity:1;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(5,10,20,0.7);z-index:100;
+    display:none;align-items:center;justify-content:center;padding:16px;}
+  .modal-overlay.show{display:flex;}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:20px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto;}
+  .modal-box h3{margin:0 0 6px;font-size:15px;}
+  .modal-meta{font-size:12px;color:var(--accent2);margin-bottom:14px;}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
   @media(max-width:520px){.meta-row{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -457,6 +465,7 @@
         <div id="vFilteredTotal" style="font-size:22px;font-weight:700;color:var(--accent2);margin-top:4px;"></div>
       </div>
       <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="vGenerateLetterBtn">📄 Generate Letter</button>
         <button class="btn btn-secondary btn-sm" id="vExportXlsxBtn">Export .xlsx</button>
         <button class="btn btn-secondary btn-sm" id="vExportCsvBtn">Export .csv</button>
         <button class="danger-link" id="vClearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
@@ -493,10 +502,29 @@
 
 <div id="toast"></div>
 
+<div class="modal-overlay" id="letterModalOverlay">
+  <div class="modal-box">
+    <h3>📄 Generate Acknowledgement Letter</h3>
+    <div class="modal-meta" id="letterModalMeta"></div>
+    <label for="letterGreeting">Greeting</label>
+    <input type="text" id="letterGreeting" placeholder="Dear ...,">
+    <div style="margin-top:12px;">
+      <label for="letterOpeningNote">Opening note (optional — an award, highlight, etc.)</label>
+      <textarea id="letterOpeningNote" style="min-height:70px;" placeholder="e.g. We got the World Engineering Excellence award, and we won't be here without your coaching and help!"></textarea>
+    </div>
+    <p class="hint">Letter date and hours table use today's date and the Volunteer/Month filters currently selected above.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="letterCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="letterGenerateBtn">Generate PDF</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

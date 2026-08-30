@@ -25,11 +25,22 @@ with entries, etc.), the fix is tightening `firestore.rules` — worth asking me
 that day comes.
 
 ## Deploy to GitHub Pages
-1. Push `index.html`, `app.js`, `manifest.json`, `sw.js`, `firebase-config.js` (filled in) to a repo, e.g.
-   `wangjia228-svg.github.io/HourTrack`. (`firestore.rules` doesn't need to be deployed — it only matters
-   pasted into the Firebase Console, as in step 3 above.)
+1. Push `index.html`, `app.js`, `manifest.json`, `sw.js`, `firebase-config.js` (filled in), `gra-logo.png`,
+   `turtlebots-logo.png` to a repo, e.g. `wangjia228-svg.github.io/HourTrack`. (`firestore.rules` doesn't
+   need to be deployed — it only matters pasted into the Firebase Console, as in step 3 above.)
 2. Enable GitHub Pages on that branch.
 3. Share the link — everyone sees the same live data.
+
+## Volunteer acknowledgement letters
+On the **Volunteers** tab, pick a specific volunteer and month in the filters above the entries table, then
+click **📄 Generate Letter**. It builds a one-page PDF (org logos, date, hours table, boilerplate) and
+downloads it — no need to screenshot the table into a doc by hand anymore.
+- The org name, EIN, address, contact emails, team name, and who signs the letter are all set in
+  `LETTER_CONFIG` near the top of `app.js` — edit those once for your org.
+- Each time you generate a letter you can edit the greeting line (e.g. "Dear Mr. ...") and add an optional
+  one-off note (an award, a shoutout, etc.) before it downloads.
+- `gra-logo.png` and `turtlebots-logo.png` are the two logos used in the letterhead — swap in your own
+  files (same filenames) if your org's branding changes.
 
 ## Notes
 - Column schema: Name, Date, Activity, Duration (hours), Comments (optional), Week.
