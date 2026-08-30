@@ -1239,10 +1239,7 @@ letterGenerateBtn.addEventListener('click', () => {
   const letterBodyHtml = `
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:26px;">
       <img src="${logoLeftUrl}" style="height:64px;">
-      <div style="text-align:center;">
-        <img src="${logoRightUrl}" style="height:64px; display:block; margin:0 auto;">
-        <div style="color:#2a9d6f; font-weight:bold; font-size:14px; margin-top:2px;">${escapeHtml(c.teamName)}</div>
-      </div>
+      <img src="${logoRightUrl}" style="height:64px; display:block;">
     </div>
     <div style="margin-bottom:16px;">${escapeHtml(dateStr)}</div>
     <div style="margin-bottom:16px;">${escapeHtml(greeting)}</div>
@@ -1294,10 +1291,15 @@ letterGenerateBtn.addEventListener('click', () => {
   const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
     <title>Acknowledgement - ${escapeHtml(volunteerName)} - ${escapeHtml(monthText)}</title>
     <style>
-      @page { size: letter; margin: 0.5in; }
+      /* Margin is baked in as padding on the content itself (not @page) because
+         browsers' own print-dialog margin setting (Default/None/Custom) can silently
+         override @page CSS margins — this way the whitespace shows up regardless of
+         whatever the person has that dropdown set to. */
+      @page { size: letter; margin: 0; }
       body { margin:0; font-family: Arial, Helvetica, sans-serif; color:#1a1a1a; font-size:13px; }
+      .letter-page { box-sizing:border-box; width:8.5in; min-height:11in; padding:0.75in; }
     </style>
-  </head><body>${letterBodyHtml}</body></html>`;
+  </head><body><div class="letter-page">${letterBodyHtml}</div></body></html>`;
 
   // Native browser print → "Save as PDF" instead of a canvas-screenshot library —
   // far more reliable across browsers than trying to rasterize hidden/off-screen content.
