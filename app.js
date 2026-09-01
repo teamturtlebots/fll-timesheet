@@ -1368,6 +1368,290 @@ document.getElementById('vExportCsvBtn').addEventListener('click', () => {
   toast('Exported .csv');
 });
 
+// ---------- Sharing (FLL Sharing order tracker) ----------
+const shPaste = document.getElementById('shPaste');
+const shParseBtn = document.getElementById('shParseBtn');
+const shClearPasteBtn = document.getElementById('shClearPasteBtn');
+const shForm = document.getElementById('shForm');
+const shFormTitle = document.getElementById('shFormTitle');
+const shDate = document.getElementById('shDate');
+const shUser = document.getElementById('shUser');
+const shEmail = document.getElementById('shEmail');
+const shCompetition = document.getElementById('shCompetition');
+const shTeamName = document.getElementById('shTeamName');
+const shTeamNumber = document.getElementById('shTeamNumber');
+const shLocation = document.getElementById('shLocation');
+const shProduct = document.getElementById('shProduct');
+const shSubmitBtn = document.getElementById('shSubmitBtn');
+const shCancelEditBtn = document.getElementById('shCancelEditBtn');
+const shStatsGrid = document.getElementById('shStatsGrid');
+const shEntriesBody = document.getElementById('shEntriesBody');
+const shEmptyMsg = document.getElementById('shEmptyMsg');
+const shFilterCompetition = document.getElementById('shFilterCompetition');
+const shFilterSearch = document.getElementById('shFilterSearch');
+
+let sharingEntries = [];
+let shEditingId = null;
+let shSortKey = 'date';
+let shSortDir = 'desc';
+
+shDate.value = localDateStr();
+
+// Best-effort parser for the pasted order text. Everything it fills stays
+// editable, so an odd/unexpected paste format just means a blank field
+// rather than a bad save.
+function parseSharingPaste(raw) {
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const result = { user: '', email: '', competition: '', teamName: '', teamNumber: '', location: '', product: '' };
+  if (!lines.length) return result;
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailIdx = lines.findIndex(l => emailRegex.test(l));
+  if (emailIdx > -1) {
+    result.email = lines[emailIdx];
+    if (emailIdx > 0) result.user = lines[emailIdx - 1];
+  } else {
+    result.user = lines[0];
+  }
+
+  const totalIdx = lines.findIndex(l => /^total count:/i.test(l));
+  if (totalIdx > -1 && lines[totalIdx + 1]) result.product = lines[totalIdx + 1];
+
+  function valueAfterLabel(matcher) {
+    const idx = lines.findIndex(matcher);
+    return (idx > -1 && lines[idx + 1]) ? lines[idx + 1] : '';
+  }
+
+  result.competition = valueAfterLabel(l => /which robotics competition/i.test(l));
+  result.teamName = valueAfterLabel(l => /^team name$/i.test(l));
+  result.teamNumber = valueAfterLabel(l => /^team number/i.test(l));
+  result.location = valueAfterLabel(l => /^city\/?\s*region\/?\s*country/i.test(l));
+
+  if (result.competition) {
+    const known = { fll: 'FLL', wro: 'WRO', vex: 'VEX', vrc: 'VRC', ftc: 'FTC', frc: 'FRC' };
+    const key = result.competition.trim().toLowerCase();
+    result.competition = known[key] || result.competition.trim();
+  }
+
+  return result;
+}
+
+shParseBtn.addEventListener('click', () => {
+  const parsed = parseSharingPaste(shPaste.value);
+  if (!parsed.user && !parsed.email && !parsed.teamName) {
+    toast("Couldn't find recognizable fields — fill them in manually below");
+    return;
+  }
+  shUser.value = parsed.user;
+  shEmail.value = parsed.email;
+  shCompetition.value = parsed.competition;
+  shTeamName.value = parsed.teamName;
+  shTeamNumber.value = parsed.teamNumber;
+  shLocation.value = parsed.location;
+  shProduct.value = parsed.product;
+  if (!shDate.value) shDate.value = localDateStr();
+  toast('Parsed — review the fields below, then Save Share');
+  document.getElementById('shFormTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+shClearPasteBtn.addEventListener('click', () => { shPaste.value = ''; });
+
+shForm.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const entry = {
+    date: shDate.value,
+    user: shUser.value.trim(),
+    email: shEmail.value.trim(),
+    competition: shCompetition.value.trim(),
+    teamName: shTeamName.value.trim(),
+    teamNumber: shTeamNumber.value.trim(),
+    location: shLocation.value.trim(),
+    product: shProduct.value.trim()
+  };
+  if (!entry.date || !entry.user) { toast('Date and User are required'); return; }
+
+  const savePromise = shEditingId
+    ? db.collection('sharingRecords').doc(shEditingId).set(entry)
+    : db.collection('sharingRecords').add(entry);
+
+  savePromise
+    .then(() => {
+      toast(shEditingId ? 'Share updated' : 'Share saved');
+      shResetForm();
+      shPaste.value = '';
+    })
+    .catch(err => toast('Error: ' + err.message));
+});
+
+function shResetForm() {
+  shEditingId = null;
+  shForm.reset();
+  shDate.value = localDateStr();
+  shSubmitBtn.textContent = 'Save Share';
+  shCancelEditBtn.style.display = 'none';
+  shFormTitle.textContent = 'Share Details';
+}
+shCancelEditBtn.addEventListener('click', shResetForm);
+
+function shStartEdit(id) {
+  const e = sharingEntries.find(x => x.id === id);
+  if (!e) return;
+  shEditingId = id;
+  shDate.value = e.date || '';
+  shUser.value = e.user || '';
+  shEmail.value = e.email || '';
+  shCompetition.value = e.competition || '';
+  shTeamName.value = e.teamName || '';
+  shTeamNumber.value = e.teamNumber || '';
+  shLocation.value = e.location || '';
+  shProduct.value = e.product || '';
+  shSubmitBtn.textContent = 'Save Changes';
+  shCancelEditBtn.style.display = 'inline-block';
+  shFormTitle.textContent = 'Editing Share';
+  shFormTitle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function shDeleteEntry(id) {
+  if (!confirm('Delete this shared record?')) return;
+  db.collection('sharingRecords').doc(id).delete()
+    .then(() => toast('Record deleted'))
+    .catch(err => toast('Error: ' + err.message));
+}
+
+document.getElementById('shClearAllBtn').addEventListener('click', () => {
+  if (!requireAdminPasscode('delete ALL sharing records')) return;
+  if (!confirm('Delete ALL sharing records? This cannot be undone.')) return;
+  db.collection('sharingRecords').get().then(snapshot => {
+    const batch = db.batch();
+    snapshot.docs.forEach(d => batch.delete(d.ref));
+    return batch.commit();
+  })
+    .then(() => toast('All sharing records cleared'))
+    .catch(err => toast('Error: ' + err.message));
+});
+
+[shFilterCompetition, shFilterSearch].forEach(el => el.addEventListener('input', renderSharing));
+document.querySelectorAll('th[data-ssort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.ssort;
+    if (shSortKey === key) shSortDir = shSortDir === 'asc' ? 'desc' : 'asc';
+    else { shSortKey = key; shSortDir = 'asc'; }
+    renderSharing();
+  });
+});
+
+function shNorm(s) { return (s || '').trim().toLowerCase(); }
+
+function renderSharingStats(rows) {
+  const teamKey = e => shNorm(e.teamName) + '|' + shNorm(e.teamNumber);
+  const uniqueTeams = new Set(rows.filter(e => e.teamName).map(teamKey)).size;
+  const uniqueLocations = new Set(rows.filter(e => e.location).map(e => shNorm(e.location))).size;
+  const uniqueCompetitions = new Set(rows.filter(e => e.competition).map(e => shNorm(e.competition))).size;
+
+  shStatsGrid.innerHTML = `
+    <div class="stat"><div class="val">${rows.length}</div><div class="lbl">Total shares</div></div>
+    <div class="stat"><div class="val">${uniqueTeams}</div><div class="lbl">Teams helped</div></div>
+    <div class="stat"><div class="val">${uniqueLocations}</div><div class="lbl">Locations reached</div></div>
+    <div class="stat"><div class="val">${uniqueCompetitions}</div><div class="lbl">Competitions</div></div>
+  `;
+}
+
+function renderSharing() {
+  renderSharingStats(sharingEntries);
+
+  // filter dropdown options
+  const comps = [...new Set(sharingEntries.map(e => e.competition).filter(Boolean))].sort();
+  const prevComp = shFilterCompetition.value;
+  shFilterCompetition.innerHTML = '<option value="">All competitions</option>' +
+    comps.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  shFilterCompetition.value = comps.includes(prevComp) ? prevComp : '';
+
+  let rows = [...sharingEntries];
+  if (shFilterCompetition.value) rows = rows.filter(e => e.competition === shFilterCompetition.value);
+  const search = shNorm(shFilterSearch.value);
+  if (search) {
+    rows = rows.filter(e =>
+      shNorm(e.user).includes(search) || shNorm(e.teamName).includes(search) || shNorm(e.location).includes(search));
+  }
+
+  rows.sort((a, b) => {
+    const av = (a[shSortKey] ?? '').toString();
+    const bv = (b[shSortKey] ?? '').toString();
+    const cmp = av.localeCompare(bv, undefined, { numeric: true });
+    return shSortDir === 'asc' ? cmp : -cmp;
+  });
+
+  shEmptyMsg.style.display = rows.length ? 'none' : 'block';
+  shEntriesBody.innerHTML = rows.map(e => `
+    <tr>
+      <td>${fmtDate(e.date)}</td>
+      <td>${escapeHtml(e.user || '')}</td>
+      <td>${escapeHtml(e.teamName || '')}</td>
+      <td>${escapeHtml(e.teamNumber || '')}</td>
+      <td>${escapeHtml(e.location || '')}</td>
+      <td><span class="pill">${escapeHtml(e.competition || '—')}</span></td>
+      <td>${escapeHtml(e.product || '')}</td>
+      <td class="row-actions">
+        <button class="btn btn-secondary btn-sm" onclick="shStartEdit('${e.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="shDeleteEntry('${e.id}')">Del</button>
+      </td>
+    </tr>`).join('');
+}
+
+db.collection('sharingRecords').onSnapshot(snapshot => {
+  sharingEntries = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderSharing();
+}, err => toast('Sync error: ' + err.message));
+
+function getSharingExportRows() {
+  const rows = [...sharingEntries].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  return rows.map(e => ({
+    Date: fmtDate(e.date),
+    User: e.user || '',
+    Email: e.email || '',
+    Competition: e.competition || '',
+    'Team Name': e.teamName || '',
+    'Team Number': e.teamNumber || '',
+    'City/Region/Country': e.location || '',
+    Product: e.product || ''
+  }));
+}
+
+document.getElementById('shExportXlsxBtn').addEventListener('click', () => {
+  if (typeof XLSX === 'undefined') { toast('Export library not loaded — check connection'); return; }
+  const rows = getSharingExportRows();
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 11 }, { wch: 18 }, { wch: 24 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sharing');
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `fll-sharing-${stamp}.xlsx`);
+  toast('Exported .xlsx');
+});
+
+document.getElementById('shExportCsvBtn').addEventListener('click', () => {
+  const rows = getSharingExportRows();
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.join(','),
+    ...rows.map(r => headers.map(h => `"${String(r[h]).replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `fll-sharing-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Exported .csv');
+});
+
+window.shStartEdit = shStartEdit;
+window.shDeleteEntry = shDeleteEntry;
+
 // ---------- Service worker ----------
 // Beyond just registering, this actively checks for a newer sw.js/app version
 // (on load, whenever the app is brought to the foreground, and periodically

@@ -135,6 +135,7 @@
   <div class="maintab active" data-maintab="summary">📊 Summary</div>
   <div class="maintab" data-maintab="entry">📝 Entry</div>
   <div class="maintab" data-maintab="volunteers">🙋 Volunteers</div>
+  <div class="maintab" data-maintab="sharing">🤝 Sharing</div>
 </nav>
 
 <main>
@@ -494,6 +495,119 @@
       </table>
     </div>
     <div class="empty" id="vEmptyMsg" style="display:none;">No volunteer entries yet — add the first one above.</div>
+  </div>
+
+</div>
+
+<!-- ============ SHARING PANEL ============ -->
+<div class="mainpanel" id="panel-sharing">
+
+  <div class="card">
+    <h2>Paste Order</h2>
+    <label for="shPaste">Paste the raw order text from your store</label>
+    <textarea id="shPaste" style="min-height:170px;" placeholder="Tolga Aydoğ
+tolgarft@icloud.com
+Pick-up
+ITEM(S) PURCHASED
+Total count: 1
+FLL SUBMERGED 2024–2025 Robot Code
+$0.00
+Not fulfilled
+Which robotics competition do you primarily participate in? (FLL, WRO, VEX, etc.)
+Fll
+Team Name
+Dogatech
+Team Number (If applicable)
+25
+City/Region/Country
+Turkey"></textarea>
+    <div class="actions-row" style="margin-top:10px;">
+      <button class="btn btn-primary" id="shParseBtn">✨ Parse into fields</button>
+      <button class="btn btn-secondary" id="shClearPasteBtn">Clear</button>
+    </div>
+    <p class="hint">Parsing just fills the form below — nothing is saved until you click <b>Save Share</b>, so double-check the fields first.</p>
+  </div>
+
+  <div class="card">
+    <h2 id="shFormTitle">Share Details</h2>
+    <form id="shForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <label for="shDate">Date</label>
+        <input type="date" id="shDate" required>
+      </div>
+      <div>
+        <label for="shUser">User</label>
+        <input type="text" id="shUser" required placeholder="e.g. Tolga Aydoğ">
+      </div>
+      <div>
+        <label for="shEmail">Email</label>
+        <input type="email" id="shEmail" placeholder="e.g. name@example.com">
+      </div>
+      <div>
+        <label for="shCompetition">Competition</label>
+        <input type="text" id="shCompetition" placeholder="e.g. FLL">
+      </div>
+      <div>
+        <label for="shTeamName">Team Name</label>
+        <input type="text" id="shTeamName" placeholder="e.g. Dogatech">
+      </div>
+      <div>
+        <label for="shTeamNumber">Team Number</label>
+        <input type="text" id="shTeamNumber" placeholder="e.g. 25">
+      </div>
+      <div>
+        <label for="shLocation">City/Region/Country</label>
+        <input type="text" id="shLocation" placeholder="e.g. Turkey">
+      </div>
+      <div>
+        <label for="shProduct">Product</label>
+        <input type="text" id="shProduct" placeholder="e.g. FLL SUBMERGED 2024–2025 Robot Code">
+      </div>
+      <div class="full" style="grid-column:1/-1;">
+        <button type="submit" class="btn btn-primary" id="shSubmitBtn">Save Share</button>
+        <button type="button" class="btn btn-secondary" id="shCancelEditBtn" style="display:none;">Cancel Edit</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Impact</h2>
+    <div class="stats-grid" id="shStatsGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Shared Records</h2>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="shExportXlsxBtn">Export .xlsx</button>
+        <button class="btn btn-secondary btn-sm" id="shExportCsvBtn">Export .csv</button>
+        <button class="danger-link" id="shClearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="shFilterCompetition"><option value="">All competitions</option></select>
+        <input type="text" id="shFilterSearch" placeholder="Filter user/team/country…">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="entries">
+        <thead>
+          <tr>
+            <th data-ssort="date">Date</th>
+            <th data-ssort="user">User</th>
+            <th data-ssort="teamName">Team Name</th>
+            <th data-ssort="teamNumber">Team #</th>
+            <th data-ssort="location">Location</th>
+            <th data-ssort="competition">Comp.</th>
+            <th data-ssort="product">Product</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="shEntriesBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="shEmptyMsg" style="display:none;">No shares logged yet — paste an order above to add the first one.</div>
   </div>
 
 </div>
