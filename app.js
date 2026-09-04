@@ -1392,7 +1392,7 @@ const shFilterSearch = document.getElementById('shFilterSearch');
 
 let sharingEntries = [];
 let shEditingId = null;
-let shSortKey = 'date';
+let shSortKey = 'createdAt';
 let shSortDir = 'desc';
 
 shDate.value = localDateStr();
@@ -1470,9 +1470,17 @@ shForm.addEventListener('submit', (ev) => {
   };
   if (!entry.date || !entry.user) { toast('Date and User are required'); return; }
 
-  const savePromise = shEditingId
-    ? db.collection('sharingRecords').doc(shEditingId).set(entry)
-    : db.collection('sharingRecords').add(entry);
+  let savePromise;
+  if (shEditingId) {
+    // keep the original entry-order timestamp; backfill it if this record
+    // predates the createdAt field so it gets a stable position going forward.
+    const existing = sharingEntries.find(x => x.id === shEditingId);
+    entry.createdAt = (existing && existing.createdAt) || new Date().toISOString();
+    savePromise = db.collection('sharingRecords').doc(shEditingId).set(entry);
+  } else {
+    entry.createdAt = new Date().toISOString();
+    savePromise = db.collection('sharingRecords').add(entry);
+  }
 
   savePromise
     .then(() => {
