@@ -1,226 +1,645 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#1B3A2F" />
-<title>BARP</title>
-<link rel="manifest" href="manifest.json" />
-<link rel="icon" href="icons/icon-192.png" />
-<link rel="apple-touch-icon" href="icons/icon-192.png" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="stylesheet" href="styles.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1e3a5f">
+<title>HourTrack — FLL Time Log</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%231e3a5f%22/><text x=%2250%22 y=%2268%22 font-size=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>H</text></svg>">
+<style>
+  :root{
+    --bg:#0f172a; --panel:#16213a; --panel2:#1c2942; --border:#2a3a5c;
+    --accent:#4f8ef7; --accent2:#3ddc97; --text:#e6ecf7; --muted:#8fa1c0;
+    --danger:#ef5b6b; --warn:#f5b93d;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);padding-bottom:60px;}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#16213a,#16213aee);
+    backdrop-filter:blur(6px);border-bottom:1px solid var(--border);padding:14px 16px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  header h1{font-size:17px;margin:0;display:flex;align-items:center;gap:8px;}
+  header h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--accent2);}
+  #status{font-size:11px;color:var(--muted);}
+
+  /* Top-level Entry/Summary tabs */
+  .maintabs{position:sticky;top:53px;z-index:9;display:flex;background:var(--bg);
+    border-bottom:1px solid var(--border);}
+  .maintab{flex:1;text-align:center;padding:12px 8px;font-size:14px;font-weight:700;
+    color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;}
+  .maintab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .mainpanel{display:none;}
+  .mainpanel.active{display:block;}
+
+  main{max-width:960px;margin:0 auto;padding:16px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--border);
+    color:var(--text);padding:11px 10px;border-radius:8px;font-size:16px;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:36px;}
+  .btn{cursor:pointer;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;min-height:44px;}
+  .btn-primary{background:var(--accent);color:#08122a;}
+  .btn-secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+  .btn-sm{padding:7px 12px;font-size:12px;min-height:36px;}
+  .row-actions{display:flex;gap:6px;}
+
+  /* Tabs */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;}
+  .tab{padding:8px 14px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;}
+  .tab.active{background:var(--accent);color:#08122a;border-color:var(--accent);}
+  .vmtab{padding:6px 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;display:inline-block;}
+  .vmtab.active{background:var(--accent);color:#08122a;border-color:var(--accent);}
+  .tabpanel{display:none;}
+  .tabpanel.active{display:block;}
+
+  /* Matrix */
+  .meta-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .meta-row .full{grid-column:1/-1;}
+  table.matrix{width:100%;border-collapse:collapse;font-size:13px;}
+  table.matrix th,table.matrix td{border:1px solid var(--border);padding:6px;text-align:center;}
+  table.matrix th{color:var(--muted);font-size:11px;text-transform:uppercase;background:var(--panel2);}
+  table.matrix td.namecell{text-align:left;font-weight:600;background:var(--panel2);white-space:nowrap;}
+  table.matrix input.hourcell{width:64px;text-align:center;padding:6px 4px;}
+  .matrix-wrap{overflow-x:auto;}
+  tr.quickfill-row th{background:var(--panel2);padding:4px 6px;}
+  tr.quickfill-row input.fillcell{width:64px;text-align:center;padding:6px 4px;border-color:var(--accent);background:#1b2947;}
+  tr.quickfill-row input.fillcell::placeholder{color:var(--accent);}
+  tr.quickfill-row th:first-child{font-size:11px;text-transform:none;color:var(--accent);font-weight:600;text-align:left;}
+
+  .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .hint code{background:var(--panel2);padding:1px 5px;border-radius:4px;}
+  .danger-link{background:none;border:none;color:var(--muted);font-size:11px;
+    text-decoration:underline;cursor:pointer;padding:10px 0 0;display:block;opacity:0.6;}
+  .danger-link:hover{opacity:1;color:var(--danger);}
+
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .filters select,.filters input{width:auto;min-width:110px;}
+  table.entries{width:100%;border-collapse:collapse;font-size:13px;}
+  table.entries th,table.entries td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  table.entries th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;cursor:pointer;user-select:none;}
+  table.entries tbody tr:hover{background:var(--panel2);}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#22314f;font-size:11px;color:var(--accent);}
+  .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:13px;}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:10px;}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+  .stat .val{font-size:20px;font-weight:700;}
+  .stat .lbl{font-size:11px;color:var(--muted);}
+
+  .summary-sub{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+  .summary-sub h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;}
+  .barrow{display:grid;grid-template-columns:70px 1fr 50px;align-items:center;gap:8px;margin-bottom:2px;font-size:13px;}
+  .bartrack{background:var(--panel2);border-radius:6px;height:14px;overflow:hidden;}
+  .barfill{background:var(--accent);height:100%;border-radius:6px;}
+  .barfill-stack{display:flex;height:100%;}
+  .barfill-stack span{display:block;height:100%;}
+  .barval{text-align:right;color:var(--muted);font-size:12px;}
+  .barbreakdown{font-size:11px;color:var(--muted);margin:0 0 10px 78px;}
+  .pie-flex{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+  .legend{display:flex;flex-direction:column;gap:6px;font-size:13px;}
+  .legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .legend-item{display:flex;align-items:center;gap:8px;}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  table.weeklytable{font-size:12px;}
+  table.weeklytable th,table.weeklytable td{padding:6px 8px;}
+  .actions-row{display:flex;gap:8px;flex-wrap:wrap;}
+  #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    background:var(--panel2);border:1px solid var(--border);padding:10px 16px;border-radius:8px;
+    font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;}
+  #toast.show{opacity:1;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(5,10,20,0.7);z-index:100;
+    display:none;align-items:center;justify-content:center;padding:16px;}
+  .modal-overlay.show{display:flex;}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:20px;max-width:460px;width:100%;max-height:88vh;overflow-y:auto;}
+  .modal-box h3{margin:0 0 6px;font-size:15px;}
+  .modal-meta{font-size:12px;color:var(--accent2);margin-bottom:14px;}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+  @media(max-width:520px){.meta-row{grid-template-columns:1fr;}}
+</style>
 </head>
 <body>
 
-<header class="app-header">
-  <div class="header-stamp">BARP</div>
-  <div class="header-text">
-    <h1 id="season-title">BARP</h1>
-    <p class="header-sub" id="header-subline">bobot attachment &amp; run progress</p>
-  </div>
+<header>
+  <h1><span class="dot"></span> HourTrack</h1>
+  <div id="status">Loading…</div>
 </header>
 
-<main id="view-root">
+<nav class="maintabs">
+  <div class="maintab active" data-maintab="summary">📊 Summary</div>
+  <div class="maintab" data-maintab="entry">📝 Entry</div>
+  <div class="maintab" data-maintab="volunteers">🙋 Volunteers</div>
+  <div class="maintab" data-maintab="sharing">🤝 Sharing</div>
+</nav>
 
-  <!-- LOG VIEW -->
-  <section class="view" id="view-log">
-    <div class="section-row">
-      <h2>Attachments</h2>
-      <button class="btn btn-amber" id="btn-record-iteration">+ Record Iteration</button>
-    </div>
-    <div id="iteration-total-line" class="iteration-total-line"></div>
-    <div id="base-robot-iteration-total-line" class="iteration-total-line"></div>
+<main>
 
-    <div class="filter-row">
-      <div id="attachment-chips" class="chip-row"></div>
-      <select id="sort-select" class="sort-select">
-        <option value="date">Sort: Date</option>
-        <option value="name">Sort: Name</option>
-      </select>
-    </div>
+<!-- ============ ENTRY PANEL ============ -->
+<div class="mainpanel" id="panel-entry">
 
-    <div id="log-empty-state" class="empty-state" hidden>
-      <p>No attachments added yet.</p>
-      <p class="empty-sub">Go to Settings to add and manage robot attachments.</p>
+  <div class="card">
+    <h2>Log Time</h2>
+    <div class="tabs">
+      <div class="tab active" data-tab="matrix">Matrix Entry</div>
+      <div class="tab" data-tab="single">Single Entry</div>
     </div>
 
-    <div id="log-select-prompt" class="empty-state" hidden>
-      <p class="empty-sub">Select one or more attachments above (or tap All) to view their logged changes.</p>
-    </div>
-
-    <div id="entry-list" class="entry-list"></div>
-  </section>
-
-  <!-- RUNS VIEW -->
-  <section class="view" id="view-runs" hidden>
-    <button class="btn btn-amber btn-full btn-start-run" id="btn-start-run">&#9654; Start New Practice Game Run</button>
-
-    <div id="run-stats" class="stat-strip"></div>
-
-    <div class="section-row">
-      <h3 style="font-size:0.92rem;">Filter by date</h3>
-      <button class="btn-small-link" id="btn-clear-run-filter">Clear</button>
-    </div>
-    <div class="run-filter-row">
-      <input type="datetime-local" id="run-filter-from" class="text-input">
-      <span class="run-filter-to-label">to</span>
-      <input type="datetime-local" id="run-filter-to" class="text-input">
-    </div>
-
-    <div id="run-list" class="run-list"></div>
-  </section>
-
-  <!-- ANALYSIS VIEW -->
-  <section class="view" id="view-analysis" hidden>
-    <div class="section-row">
-      <h2>Analysis</h2>
-    </div>
-    <p class="empty-sub">Breakdown (in Game Runs) looks at one run in detail — this looks across every completed run together.</p>
-    <div class="analysis-tabs">
-      <button type="button" class="analysis-tab-btn" data-tab="trend">Score Trend</button>
-      <button type="button" class="analysis-tab-btn" data-tab="missions">Missions</button>
-    </div>
-    <div id="analysis-trend-body"></div>
-    <div id="analysis-missions-body" hidden></div>
-  </section>
-
-  <!-- SETUP VIEW -->
-  <section class="view" id="view-setup" hidden>
-    <div class="settings-layout">
-      <nav class="settings-sidebar">
-        <button type="button" class="settings-sidebar-btn active" data-settings-section="general">General</button>
-        <button type="button" class="settings-sidebar-btn" data-settings-section="account">Account &amp; Backup</button>
-      </nav>
-      <div class="settings-content">
-        <div id="settings-section-general" class="settings-section">
-          <div class="section-row">
-            <h2>Attachments</h2>
-            <div id="attachment-order-toolbar-top" class="order-toolbar-top"></div>
-          </div>
-          <div id="attachment-setup-list" class="mission-list"></div>
-
-          <div class="section-row" style="margin-top:28px;">
-            <h2>Runs</h2>
-            <div id="order-toolbar-top" class="order-toolbar-top"></div>
-          </div>
-          <div id="rungroup-list" class="mission-list"></div>
-
-          <div class="section-row" style="margin-top:28px;">
-            <h2>Missions &amp; Tasks</h2>
-          </div>
-          <p class="empty-sub">Every mission and task for the season, with its points — fixed to this year's official missions and not editable here. Runs below pull specific missions (or even just some of a mission's tasks) from this list, and each task can only be used by one Run at a time.</p>
-          <div id="missionbank-list" class="mission-list"></div>
-
-          <div class="section-row" style="margin-top:28px;">
-            <h2>App Settings</h2>
-          </div>
-          <p class="empty-sub">Controls how practice game runs are scored and timed, and how attachment iterations get logged.</p>
-          <label class="checkbox-row checkbox-row-standalone"><input type="checkbox" id="input-skip-equipment-inspection" checked> Don't ask about the Equipment Inspection bonus before each run (it will always count as passed)</label>
-          <label class="checkbox-row checkbox-row-standalone"><input type="checkbox" id="input-keep-going-after-buzzer"> Keep scoring after time runs out (timer keeps counting instead of ending the run)</label>
-          <label class="checkbox-row checkbox-row-standalone"><input type="checkbox" id="input-interactive-scoring" checked> Interactive mode for scoring runs (step-by-step mission prompts; off just shows the timer, then the overview to fill in scores)</label>
-          <label class="checkbox-row checkbox-row-standalone"><input type="checkbox" id="input-interactive-iterations"> Interactive mode for logging attachment iterations (one step at a time, camera-first)</label>
+    <!-- MATRIX TAB -->
+    <div class="tabpanel active" id="tab-matrix">
+      <div class="meta-row">
+        <div>
+          <label for="mDate">Date (applies to whole save)</label>
+          <input type="date" id="mDate">
         </div>
+        <div>
+          <label for="mWeek">Week (auto-calculated)</label>
+          <input type="text" id="mWeek" readonly>
+        </div>
+      </div>
 
-        <div id="settings-section-account" class="settings-section" hidden>
-          <div class="section-row">
-            <h2>Team Sync</h2>
-          </div>
-          <p class="empty-sub">Signing in connects this device to your team's shared cloud database — it's used both as a backup and to let the whole team see each other's attachments, iterations, and runs, not just what's on this one device. No extra setup needed beyond signing in.</p>
-          <p class="empty-sub" id="google-signin-status">Not signed in.</p>
-          <button class="btn btn-primary" id="btn-google-signin">Sign in with Google</button>
-          <button class="btn btn-ghost" id="btn-google-signout" hidden>Sign out</button>
-          <p class="empty-sub" id="drive-sync-status" hidden>Not synced yet.</p>
+      <div class="matrix-wrap">
+        <table class="matrix" id="matrixTable">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Name</th>
+              <th>Robot</th>
+              <th>Project</th>
+              <th>Community</th>
+              <th style="text-align:left;">Comments</th>
+            </tr>
+            <tr class="quickfill-row">
+              <th style="text-align:left;">Fill all ⬇</th>
+              <th><input type="number" class="hourcell fillcell" step="0.25" min="0" data-activity="Robot" placeholder="↓"></th>
+              <th><input type="number" class="hourcell fillcell" step="0.25" min="0" data-activity="Project" placeholder="↓"></th>
+              <th><input type="number" class="hourcell fillcell" step="0.25" min="0" data-activity="Community" placeholder="↓"></th>
+              <th><input type="text" class="commentcell fillcell" id="fillComment" placeholder="↓"></th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
+      </div>
 
-          <div class="section-row" style="margin-top:28px;">
-            <h2>Recently Deleted</h2>
-          </div>
-          <p class="empty-sub">Deleting anything — attachments, log entries, runs, missions, tasks, or game runs — moves it here instead of erasing it right away. Restore it any time within 30 days; after that it's purged for good.</p>
-          <button class="btn btn-ghost btn-full" id="btn-recently-deleted">View Recently Deleted</button>
+      <div style="margin-top:12px;">
+        <label for="mComments">Comments (optional — applied to every entry in this save, on top of any row comment)</label>
+        <textarea id="mComments" placeholder="e.g. class, home practice, competition day"></textarea>
+      </div>
 
-          <div class="section-row" style="margin-top:28px;">
-            <h2>Backup</h2>
-          </div>
-          <p class="empty-sub">If you're signed in, everything also lives in your team's shared cloud database — this manual export is a secondary backup on top of that, useful if you're not signed in or want an offline copy.</p>
-          <div class="btn-group">
-            <button class="btn btn-ghost" id="btn-export-backup">Export full backup (.json)</button>
-            <button class="btn btn-ghost" id="btn-import-backup">Restore from backup file</button>
-          </div>
-          <button class="btn btn-danger btn-full" id="btn-reset-db" style="margin-top:8px;">Reset local data</button>
-          <p class="empty-sub">Use this if the app is stuck (e.g. a database error). This erases all local storage — but as long as you're signed in, you're fine. If not, save a backup first.</p>
+      <div class="actions-row" style="margin-top:14px;">
+        <button class="btn btn-primary" id="commitMatrixBtn">Add Entries</button>
+        <button class="btn btn-secondary" id="clearMatrixBtn">Clear Hours</button>
+      </div>
+    </div>
 
-          <div id="admin-sheets-section" hidden>
-            <div class="section-row" style="margin-top:28px;">
-              <h2>Google Sheets Export</h2>
-            </div>
-            <p class="empty-sub">Admin only. Exports everything in the app into a Google Sheet with three tabs: Time Data, Score Data, and Analysis charts — for more flexibility than fits on a phone screen.</p>
-            <p class="empty-sub" id="sheets-connect-status">Not connected.</p>
-            <button class="btn btn-primary" id="btn-sheets-connect">Connect Google Sheets</button>
-            <p class="empty-sub" id="sheets-file-status" hidden></p>
-            <button class="btn btn-amber btn-full" id="btn-sheets-export" style="margin-top:10px;" hidden>Export to Sheets</button>
-            <p class="empty-sub" id="sheets-export-status"></p>
-          </div>
+    <!-- SINGLE ENTRY TAB -->
+    <div class="tabpanel" id="tab-single">
+      <form id="entryForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label for="fName">Name</label>
+          <input list="nameList" id="fName" required placeholder="e.g. Caden">
+          <datalist id="nameList"></datalist>
+        </div>
+        <div>
+          <label for="fDate">Date</label>
+          <input type="date" id="fDate" required>
+        </div>
+        <div>
+          <label for="fActivity">Activity</label>
+          <select id="fActivity" required>
+            <option value="Robot">Robot</option>
+            <option value="Project">Project</option>
+            <option value="Community">Community</option>
+          </select>
+        </div>
+        <div>
+          <label for="fDuration">Duration (hours)</label>
+          <input type="number" id="fDuration" step="0.25" min="0" required placeholder="1.5">
+        </div>
+        <div>
+          <label for="fWeek">Week (auto-calculated)</label>
+          <input type="text" id="fWeek" readonly>
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <label for="fComments">Comments (optional)</label>
+          <textarea id="fComments" placeholder="class, home practice, etc."></textarea>
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <button type="submit" class="btn btn-primary" id="submitBtn">Add Entry</button>
+          <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Entries</h2>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="exportXlsxBtn">Export .xlsx</button>
+        <button class="btn btn-secondary btn-sm" id="exportCsvBtn">Export .csv</button>
+        <button class="danger-link" id="clearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="filterWeek"><option value="">All weeks</option></select>
+        <select id="filterActivity"><option value="">All activities</option></select>
+        <input type="text" id="filterName" placeholder="Filter name…">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="entries">
+      <thead>
+        <tr>
+          <th data-sort="name">Name</th>
+          <th data-sort="date">Date</th>
+          <th data-sort="activity">Activity</th>
+          <th data-sort="duration">Hours</th>
+          <th data-sort="comments">Comments</th>
+          <th data-sort="week">Week</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="entriesBody"></tbody>
+    </table>
+    </div>
+    <div class="empty" id="emptyMsg" style="display:none;">No entries yet — add your first one above.</div>
+  </div>
+
+</div>
+
+<!-- ============ SUMMARY PANEL ============ -->
+<div class="mainpanel active" id="panel-summary">
+
+  <div class="card">
+    <h2>Summary</h2>
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="toolbar" style="margin-top:4px;">
+      <div class="filters" id="summaryRangeButtons">
+        <div class="vmtab" data-range="1D">1D</div>
+        <div class="vmtab" data-range="3D">3D</div>
+        <div class="vmtab active" data-range="7D">7D</div>
+        <div class="vmtab" data-range="lifetime">Lifetime</div>
+        <div class="vmtab" data-range="custom">Custom</div>
+      </div>
+    </div>
+    <div class="meta-row" id="summaryCustomRange" style="display:none;margin-top:8px;">
+      <div>
+        <label for="summaryRangeStart">Start date</label>
+        <input type="date" id="summaryRangeStart">
+      </div>
+      <div>
+        <label for="summaryRangeEnd">End date</label>
+        <input type="date" id="summaryRangeEnd">
+      </div>
+    </div>
+
+    <div class="summary-sub">
+      <h3>Hours by Member <span id="summaryRangeLabel" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400;"></span></h3>
+      <div class="legend-row" id="memberLegend"></div>
+      <div id="memberBars"></div>
+    </div>
+
+    <div class="summary-sub">
+      <h3>Hours by Activity</h3>
+      <div id="activityPie"></div>
+    </div>
+
+    <div class="summary-sub">
+      <h3>Weekly Hours vs Target</h3>
+      <div id="weeklyChart"></div>
+      <h3 style="margin-top:18px;">Cumulative Hours vs Target</h3>
+      <div id="cumulativeChart"></div>
+      <div style="overflow-x:auto;margin-top:10px;">
+        <table class="entries weeklytable">
+          <thead>
+            <tr>
+              <th>Week</th><th>Actual</th><th>Target</th><th>Diff</th>
+              <th>Cum. Actual</th><th>Cum. Target</th><th>Cum. Diff</th>
+            </tr>
+          </thead>
+          <tbody id="cumulativeBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ VOLUNTEERS PANEL ============ -->
+<div class="mainpanel" id="panel-volunteers">
+
+  <div class="card">
+    <h2>Log Volunteer Time</h2>
+    <div class="tabs">
+      <div class="tab active" data-tab="vmatrix">Matrix Entry</div>
+      <div class="tab" data-tab="vsingle">Single Entry</div>
+    </div>
+
+    <!-- VOLUNTEER MATRIX TAB -->
+    <div class="tabpanel active" id="tab-vmatrix">
+      <div class="meta-row">
+        <div>
+          <label for="vmDate">Date (applies to whole save)</label>
+          <input type="date" id="vmDate">
+        </div>
+      </div>
+
+      <div class="matrix-wrap">
+        <table class="matrix" id="volunteerMatrixTable">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Volunteer</th>
+              <th>Begin</th>
+              <th>End</th>
+              <th>Hours</th>
+              <th style="text-align:left;">Description</th>
+            </tr>
+            <tr class="quickfill-row">
+              <th style="text-align:left;">Fill all ⬇</th>
+              <th><input type="time" class="fillcell" id="vFillBegin"></th>
+              <th><input type="time" class="fillcell" id="vFillEnd"></th>
+              <th></th>
+              <th><input type="text" class="fillcell" id="vFillDesc" placeholder="↓"></th>
+            </tr>
+          </thead>
+          <tbody id="volunteerMatrixBody"></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:12px;">
+        <label for="vmComments">Description (optional — applied to every entry in this save, on top of any row description)</label>
+        <textarea id="vmComments" placeholder="e.g. FLL class"></textarea>
+      </div>
+
+      <div class="actions-row" style="margin-top:14px;">
+        <button class="btn btn-secondary" id="vCopyLastBtn">📋 Copy Most Recent Entries</button>
+        <button class="btn btn-primary" id="vCommitMatrixBtn">Add Entries</button>
+        <button class="btn btn-secondary" id="vClearMatrixBtn">Clear Times</button>
+      </div>
+      <p class="hint">
+        <b>Copy Most Recent Entries</b> fills each volunteer's row with their last saved begin/end time and
+        description — usually all you need to do then is update the date.
+      </p>
+    </div>
+
+    <!-- VOLUNTEER SINGLE ENTRY TAB -->
+    <div class="tabpanel" id="tab-vsingle">
+      <form id="volunteerForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label for="vDate">Date</label>
+          <input type="date" id="vDate" required>
+        </div>
+        <div>
+          <label for="vVolunteer">Volunteer Name</label>
+          <select id="vVolunteer" required>
+            <option value="" disabled selected>Select volunteer…</option>
+            <option value="Liang Xue">Liang Xue</option>
+            <option value="Sheng Yin">Sheng Yin</option>
+          </select>
+        </div>
+        <div>
+          <label for="vBegin">Begin Time</label>
+          <input type="time" id="vBegin" required>
+        </div>
+        <div>
+          <label for="vEnd">End Time</label>
+          <input type="time" id="vEnd" required>
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <label for="vHours">Hours (auto-calculated)</label>
+          <input type="text" id="vHours" readonly placeholder="fill in times above">
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <label for="vDescription">Description</label>
+          <textarea id="vDescription" placeholder="e.g. FLL class, guide team build mission models"></textarea>
+        </div>
+        <div class="full" style="grid-column:1/-1;">
+          <button type="submit" class="btn btn-primary" id="vSubmitBtn">Add Entry</button>
+          <button type="button" class="btn btn-secondary" id="vCancelEditBtn" style="display:none;">Cancel Edit</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="actions-row" id="vImportRow" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary btn-sm" id="vImportBtn">📥 Import Historical Records</button>
+    </div>
+    <p class="hint" id="vImportHint">
+      One-time import of your past spreadsheet records. Safe to click once — if you run it twice you'll get
+      duplicates (just delete the extras from the list below if that happens).
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Monthly Summary by Person</h2>
+      <div class="actions-row">
+        <div class="tabs" style="margin-bottom:0;">
+          <div class="vmtab active" data-vmview="chart">📊 Chart</div>
+          <div class="vmtab" data-vmview="table">📋 Table</div>
         </div>
       </div>
     </div>
-  </section>
+    <div id="volunteerMonthlyChartWrap">
+      <div class="legend-row" id="volunteerMonthlyLegend"></div>
+      <div id="volunteerMonthlyChart"></div>
+    </div>
+    <div id="volunteerMonthlyTableWrap" style="display:none;overflow-x:auto;">
+      <table class="entries weeklytable" id="volunteerMonthlyTable">
+        <thead id="volunteerMonthlyHead"></thead>
+        <tbody id="volunteerMonthlyBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="vMonthlyEmpty" style="display:none;">No data yet.</div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div>
+        <h2 style="margin:0;">Volunteer Entries</h2>
+        <div id="vFilteredTotal" style="font-size:22px;font-weight:700;color:var(--accent2);margin-top:4px;"></div>
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="vGenerateLetterBtn">📄 Generate Letter</button>
+        <button class="btn btn-secondary btn-sm" id="vExportXlsxBtn">Export .xlsx</button>
+        <button class="btn btn-secondary btn-sm" id="vExportCsvBtn">Export .csv</button>
+        <button class="danger-link" id="vClearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="vFilterVolunteer"><option value="">All volunteers</option></select>
+        <select id="vFilterMonth"><option value="">All months</option></select>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="entries">
+        <thead>
+          <tr>
+            <th data-vsort="date">Date</th>
+            <th data-vsort="beginTime">Begin</th>
+            <th data-vsort="endTime">End</th>
+            <th data-vsort="hours">Hours</th>
+            <th data-vsort="volunteer">Volunteer</th>
+            <th data-vsort="description">Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="volunteerEntriesBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="vEmptyMsg" style="display:none;">No volunteer entries yet — add the first one above.</div>
+  </div>
+
+</div>
+
+<!-- ============ SHARING PANEL ============ -->
+<div class="mainpanel" id="panel-sharing">
+
+  <div class="card">
+    <h2>Impact</h2>
+    <div class="stats-grid" id="shStatsGrid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Paste Order</h2>
+    <label for="shPaste">Paste the raw order text from your store</label>
+    <textarea id="shPaste" style="min-height:170px;" placeholder="Tolga Aydoğ
+tolgarft@icloud.com
+Pick-up
+ITEM(S) PURCHASED
+Total count: 1
+FLL SUBMERGED 2024–2025 Robot Code
+$0.00
+Not fulfilled
+Which robotics competition do you primarily participate in? (FLL, WRO, VEX, etc.)
+Fll
+Team Name
+Dogatech
+Team Number (If applicable)
+25
+City/Region/Country
+Turkey"></textarea>
+    <div class="actions-row" style="margin-top:10px;">
+      <button class="btn btn-primary" id="shParseBtn">✨ Parse into fields</button>
+      <button class="btn btn-secondary" id="shClearPasteBtn">Clear</button>
+    </div>
+    <p class="hint">Parsing just fills the form below — nothing is saved until you click <b>Save Share</b>, so double-check the fields first.</p>
+  </div>
+
+  <div class="card">
+    <h2 id="shFormTitle">Share Details</h2>
+    <form id="shForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <label for="shDate">Date</label>
+        <input type="date" id="shDate" required>
+      </div>
+      <div>
+        <label for="shUser">User</label>
+        <input type="text" id="shUser" required placeholder="e.g. Tolga Aydoğ">
+      </div>
+      <div>
+        <label for="shEmail">Email</label>
+        <input type="email" id="shEmail" placeholder="e.g. name@example.com">
+      </div>
+      <div>
+        <label for="shCompetition">Competition</label>
+        <input type="text" id="shCompetition" placeholder="e.g. FLL">
+      </div>
+      <div>
+        <label for="shTeamName">Team Name</label>
+        <input type="text" id="shTeamName" placeholder="e.g. Dogatech">
+      </div>
+      <div>
+        <label for="shTeamNumber">Team Number</label>
+        <input type="text" id="shTeamNumber" placeholder="e.g. 25">
+      </div>
+      <div>
+        <label for="shLocation">City/Region/Country</label>
+        <input type="text" id="shLocation" placeholder="e.g. Turkey">
+      </div>
+      <div>
+        <label for="shProduct">Product</label>
+        <input type="text" id="shProduct" placeholder="e.g. FLL SUBMERGED 2024–2025 Robot Code">
+      </div>
+      <div class="full" style="grid-column:1/-1;">
+        <button type="submit" class="btn btn-primary" id="shSubmitBtn">Save Share</button>
+        <button type="button" class="btn btn-secondary" id="shCancelEditBtn" style="display:none;">Cancel Edit</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Shared Records</h2>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="shExportXlsxBtn">Export .xlsx</button>
+        <button class="btn btn-secondary btn-sm" id="shExportCsvBtn">Export .csv</button>
+        <button class="danger-link" id="shClearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="shFilterCompetition"><option value="">All competitions</option></select>
+        <input type="text" id="shFilterSearch" placeholder="Filter user/team/country…">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="entries">
+        <thead>
+          <tr>
+            <th data-ssort="date">Date</th>
+            <th data-ssort="user">User</th>
+            <th data-ssort="teamName">Team Name</th>
+            <th data-ssort="teamNumber">Team #</th>
+            <th data-ssort="location">Location</th>
+            <th data-ssort="competition">Comp.</th>
+            <th data-ssort="product">Product</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="shEntriesBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="shEmptyMsg" style="display:none;">No shares logged yet — paste an order above to add the first one.</div>
+  </div>
+
+</div>
 
 </main>
 
-<nav class="tab-bar">
-  <button class="tab-btn active" data-view="view-log">
-    <span class="tab-icon">&#128220;</span><span>Log</span>
-  </button>
-  <button class="tab-btn" data-view="view-runs">
-    <span class="tab-icon">&#127919;</span><span>Game Runs</span>
-  </button>
-  <button class="tab-btn" data-view="view-analysis">
-    <span class="tab-icon">&#128202;</span><span>Analysis</span>
-  </button>
-  <button class="tab-btn" data-view="view-setup">
-    <span class="tab-icon">&#9881;&#65039;</span><span>Settings</span>
-  </button>
-</nav>
+<div id="toast"></div>
 
-<!-- Generic modal host -->
-<div id="modal-backdrop" class="modal-backdrop" hidden>
-  <div class="modal" id="modal-box"></div>
+<div class="modal-overlay" id="letterModalOverlay">
+  <div class="modal-box">
+    <h3>📄 Generate Acknowledgement Letter</h3>
+    <div class="modal-meta" id="letterModalMeta"></div>
+    <label for="letterGreeting">Greeting</label>
+    <input type="text" id="letterGreeting" placeholder="Dear ...,">
+    <div style="margin-top:12px;">
+      <label for="letterOpeningNote">Opening note (optional — an award, highlight, etc.)</label>
+      <textarea id="letterOpeningNote" style="min-height:70px;" placeholder="e.g. We got the World Engineering Excellence award, and we won't be here without your coaching and help!"></textarea>
+    </div>
+    <p class="hint">A print window opens using today's date and the Volunteer/Month filters currently
+      selected above — choose <b>Save as PDF</b> as the destination in the print dialog (on mobile,
+      look for a similar "Save as PDF" or "Export PDF" option in the share sheet).</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="letterCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="letterGenerateBtn">Open Print Dialog</button>
+    </div>
+  </div>
 </div>
 
-<input type="file" id="file-import-missions" accept=".csv,text/csv" hidden />
-<input type="file" id="file-import-backup" accept="application/json" hidden />
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
-  import {
-    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-  import {
-    getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot
-  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyDsBz2vPqKQDy3kQvp7XXz3loUAj9yVEcc",
-    authDomain: "barp-db.firebaseapp.com",
-    projectId: "barp-db",
-    storageBucket: "barp-db.firebasestorage.app",
-    messagingSenderId: "363678146989",
-    appId: "1:363678146989:web:7ef20173392cd82ec2c124"
-  };
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  // app.js is a plain classic script (not a module), so hand it what it
-  // needs this way rather than restructuring the whole file into a module.
-  window.firebaseAuth = auth;
-  window.firebaseDb = db;
-  window.firebaseFns = { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, collection, doc, setDoc, deleteDoc, onSnapshot };
-  window.dispatchEvent(new Event("firebase-ready"));
-</script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.7/Sortable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
