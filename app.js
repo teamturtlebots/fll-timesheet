@@ -63,6 +63,10 @@ const fComments = document.getElementById('fComments');
 const nameList = document.getElementById('nameList');
 const submitBtn = document.getElementById('submitBtn');
 const cancelEditBtn = document.getElementById('cancelEditBtn');
+const timerBox = document.getElementById('timerBox');
+const timerToggleBtn = document.getElementById('timerToggleBtn');
+const timerDisplay = document.getElementById('timerDisplay');
+const timerNote = document.getElementById('timerNote');
 
 // ---------- Elements: entries table ----------
 const entriesBody = document.getElementById('entriesBody');
@@ -772,9 +776,77 @@ function renderStats(rows) {
   `;
 }
 
+// ---------- Live duration timer ----------
+// Helps students who don't have a good sense of elapsed time: start it when
+// they sit down, stop it when they're done, and it fills the Duration field
+// for them (rounded to the nearest quarter hour, since that's the field's
+// step size). Still fully editable afterward — the timer just gives a
+// starting number instead of a guess.
+let timerStartedAt = null;
+let timerIntervalId = null;
+
+function formatTimerElapsed(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+}
+
+function timerTick() {
+  timerDisplay.textContent = formatTimerElapsed(Date.now() - timerStartedAt);
+}
+
+function startTimer() {
+  timerStartedAt = Date.now();
+  timerBox.classList.add('running');
+  timerToggleBtn.textContent = '⏹ Stop & Fill Duration';
+  timerNote.style.display = 'none';
+  fDuration.disabled = true;
+  fDuration.placeholder = 'Timer running…';
+  timerTick();
+  timerIntervalId = setInterval(timerTick, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerIntervalId);
+  timerIntervalId = null;
+  const elapsedMs = Date.now() - timerStartedAt;
+  timerStartedAt = null;
+  timerBox.classList.remove('running');
+  timerToggleBtn.textContent = '▶ Start Timer';
+  fDuration.disabled = false;
+  fDuration.placeholder = '1.5';
+
+  const elapsedHours = elapsedMs / 3600000;
+  const rounded = Math.round(elapsedHours / 0.25) * 0.25;
+  fDuration.value = rounded > 0 ? rounded : 0.25; // a session that ran should log at least a quarter hour
+  timerNote.textContent = `Timed at ${formatTimerElapsed(elapsedMs)} → filled ${fDuration.value}h. Adjust if needed.`;
+  timerNote.style.display = 'block';
+  timerDisplay.textContent = '00:00:00';
+}
+
+function resetTimer() {
+  clearInterval(timerIntervalId);
+  timerIntervalId = null;
+  timerStartedAt = null;
+  timerBox.classList.remove('running');
+  timerToggleBtn.textContent = '▶ Start Timer';
+  timerDisplay.textContent = '00:00:00';
+  fDuration.disabled = false;
+  fDuration.placeholder = '1.5';
+  timerNote.style.display = 'none';
+}
+
+timerToggleBtn.addEventListener('click', () => {
+  if (timerIntervalId) stopTimer();
+  else startTimer();
+});
+
 // ---------- Single entry CRUD ----------
 form.addEventListener('submit', (ev) => {
   ev.preventDefault();
+  if (timerIntervalId) stopTimer(); // don't lose a running session if they hit submit before stopping it
   const entry = {
     name: fName.value.trim(),
     date: fDate.value,
@@ -809,6 +881,7 @@ function startEdit(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
   document.querySelector('.tab[data-tab="single"]').click();
+  resetTimer(); // editing a past entry isn't a live session
   editingId = id;
   fName.value = e.name;
   fDate.value = e.date;
@@ -834,6 +907,7 @@ function resetForm() {
   fDate.value = localDateStr();
   submitBtn.textContent = 'Add Entry';
   cancelEditBtn.style.display = 'none';
+  resetTimer();
 }
 cancelEditBtn.addEventListener('click', resetForm);
 
