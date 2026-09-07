@@ -42,12 +42,12 @@ let entries = [];
 let roster = [...DEFAULT_ROSTER];
 
 let editingId = null;
-let sortKey = 'date';
+let sortKey = 'createdAt';
 let sortDir = 'desc';
 
 let volunteerEntries = [];
 let vEditingId = null;
-let vSortKey = 'date';
+let vSortKey = 'createdAt';
 let vSortDir = 'desc';
 let vLastFilteredRows = [];
 let vLastFilteredTotal = 0;
@@ -404,6 +404,11 @@ commitMatrixBtn.addEventListener('click', () => {
 
   if (!newEntries.length) { toast('No hours entered'); return; }
 
+  // stamp each row a millisecond apart so ties within this batch still
+  // preserve a stable, deterministic order (newest at the bottom of the batch)
+  const batchBase = Date.now();
+  newEntries.forEach((e, i) => { e.createdAt = new Date(batchBase + i).toISOString(); });
+
   const batch = db.batch();
   newEntries.forEach(e => batch.set(db.collection('entries').doc(), e));
   batch.commit()
@@ -729,9 +734,17 @@ form.addEventListener('submit', (ev) => {
   };
   if (!entry.name || isNaN(entry.duration) || isNaN(entry.week)) return;
 
-  const savePromise = editingId
-    ? db.collection('entries').doc(editingId).set(entry)
-    : db.collection('entries').add(entry);
+  let savePromise;
+  if (editingId) {
+    // keep the original entry-order timestamp; backfill it if this record
+    // predates the createdAt field so it gets a stable position going forward.
+    const existing = entries.find(x => x.id === editingId);
+    entry.createdAt = (existing && existing.createdAt) || new Date().toISOString();
+    savePromise = db.collection('entries').doc(editingId).set(entry);
+  } else {
+    entry.createdAt = new Date().toISOString();
+    savePromise = db.collection('entries').add(entry);
+  }
 
   savePromise
     .then(() => {
@@ -940,9 +953,15 @@ volunteerForm.addEventListener('submit', ev => {
     return;
   }
 
-  const savePromise = vEditingId
-    ? db.collection('volunteerEntries').doc(vEditingId).set(entry)
-    : db.collection('volunteerEntries').add(entry);
+  const savePromise = (() => {
+    if (vEditingId) {
+      const existing = volunteerEntries.find(x => x.id === vEditingId);
+      entry.createdAt = (existing && existing.createdAt) || new Date().toISOString();
+      return db.collection('volunteerEntries').doc(vEditingId).set(entry);
+    }
+    entry.createdAt = new Date().toISOString();
+    return db.collection('volunteerEntries').add(entry);
+  })();
 
   savePromise
     .then(() => {
@@ -1002,7 +1021,10 @@ document.getElementById('vClearAllBtn').addEventListener('click', () => {
 document.getElementById('vImportBtn').addEventListener('click', () => {
   if (!confirm(`Import ${VOLUNTEER_SEED_DATA.length} historical records? Only do this once — running it again will create duplicates.`)) return;
   const batch = db.batch();
-  VOLUNTEER_SEED_DATA.forEach(rec => batch.set(db.collection('volunteerEntries').doc(), rec));
+  const batchBase = Date.now();
+  VOLUNTEER_SEED_DATA.forEach((rec, i) => {
+    batch.set(db.collection('volunteerEntries').doc(), { ...rec, createdAt: new Date(batchBase + i).toISOString() });
+  });
   batch.set(db.collection('meta').doc('volunteerImportStatus'), { imported: true, importedAt: new Date().toISOString() });
   batch.commit()
     .then(() => toast(`Imported ${VOLUNTEER_SEED_DATA.length} records`))
