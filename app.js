@@ -533,6 +533,8 @@ function render() {
   statusEl.textContent = `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} · synced live`;
 }
 
+let expandedMembers = new Set();
+
 function renderMemberBars(rows) {
   memberLegend.innerHTML = ACTIVITIES.map(a =>
     `<span class="legend-item"><span class="swatch" style="background:${ACTIVITY_COLORS[a]}"></span>${a}</span>`
@@ -540,9 +542,10 @@ function renderMemberBars(rows) {
 
   const byPerson = {};
   rows.forEach(e => {
-    if (!byPerson[e.name]) byPerson[e.name] = { Robot: 0, Project: 0, Community: 0, total: 0 };
+    if (!byPerson[e.name]) byPerson[e.name] = { Robot: 0, Project: 0, Community: 0, total: 0, items: [] };
     byPerson[e.name][e.activity] = (byPerson[e.name][e.activity] || 0) + Number(e.duration);
     byPerson[e.name].total += Number(e.duration);
+    byPerson[e.name].items.push(e);
   });
   const list = Object.entries(byPerson).sort((a, b) => b[1].total - a[1].total);
   if (!list.length) { memberBars.innerHTML = '<div class="empty">No data yet</div>'; return; }
@@ -556,16 +559,64 @@ function renderMemberBars(rows) {
       return `<span style="width:${segWidth}%;background:${ACTIVITY_COLORS[a]};" title="${a}: ${v[a].toFixed(1)}h"></span>`;
     }).join('');
     const breakdown = ACTIVITIES.filter(a => v[a] > 0).map(a => `${a} ${v[a].toFixed(1)}h`).join(' · ');
+    const isExpanded = expandedMembers.has(name);
+
+    const sortedItems = [...v.items].sort((a, b) =>
+      (b.createdAt || '').localeCompare(a.createdAt || '') || (b.date || '').localeCompare(a.date || ''));
+    const detailRows = sortedItems.map(e => `
+      <tr>
+        <td>${fmtDate(e.date)}</td>
+        <td><span class="pill">${escapeHtml(e.activity)}</span></td>
+        <td>${Number(e.duration).toFixed(2)}h</td>
+        <td>${escapeHtml(e.comments || '')}</td>
+        <td>Wk ${escapeHtml(String(e.week))}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn btn-secondary btn-sm" onclick="jumpToEntryEdit('${e.id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">Del</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
     return `
-      <div class="barrow">
-        <div>${escapeHtml(name)}</div>
-        <div class="bartrack"><div class="barfill-stack" style="width:${outerWidth}%;">${segments}</div></div>
-        <div class="barval">${v.total.toFixed(1)}h</div>
+      <div class="member-block${isExpanded ? ' expanded' : ''}" data-member="${escapeHtml(name)}">
+        <div class="barrow">
+          <div class="member-name"><span class="member-chevron">▶</span>${escapeHtml(name)}</div>
+          <div class="bartrack"><div class="barfill-stack" style="width:${outerWidth}%;">${segments}</div></div>
+          <div class="barval">${v.total.toFixed(1)}h</div>
+        </div>
+        <div class="barbreakdown">${escapeHtml(breakdown)}</div>
+        <div class="member-detail" style="display:${isExpanded ? 'block' : 'none'};">
+          <table>
+            <thead><tr><th>Date</th><th>Activity</th><th>Hours</th><th>Comments</th><th>Week</th><th></th></tr></thead>
+            <tbody>${detailRows}</tbody>
+          </table>
+        </div>
       </div>
-      <div class="barbreakdown">${escapeHtml(breakdown)}</div>
     `;
   }).join('');
 }
+
+// Click a member's name/bar to expand or collapse their underlying entry
+// lines for the currently-selected summary range. Delegated on the
+// container (not the row markup) so it keeps working after every re-render.
+memberBars.addEventListener('click', (ev) => {
+  const barrow = ev.target.closest('.barrow');
+  if (!barrow) return;
+  const block = barrow.closest('.member-block');
+  if (!block) return;
+  const name = block.dataset.member;
+  if (expandedMembers.has(name)) expandedMembers.delete(name);
+  else expandedMembers.add(name);
+  renderSummaryFiltered();
+});
+
+function jumpToEntryEdit(id) {
+  const entryTab = document.querySelector('.maintab[data-maintab="entry"]');
+  if (entryTab) entryTab.click();
+  startEdit(id);
+}
+window.jumpToEntryEdit = jumpToEntryEdit;
 
 const ACTIVITY_COLORS = { Robot: '#4f8ef7', Project: '#3ddc97', Community: '#f5b93d' };
 
