@@ -1814,7 +1814,8 @@ const AWARD_CATEGORIES = [
   { key: 'homework', name: 'Mission Control', tag: '(HW)', sub: 'Weekly Homework', prize: '$10', color: 'var(--accent)' },
   { key: 'class', name: 'Laser Focus', tag: '(Class)', sub: 'Staying Focused in Class', prize: '$10', color: 'var(--accent2)' },
   { key: 'chat', name: 'Signal Check', tag: '(Chat)', sub: 'Checking Team Chat Daily', prize: '$10', color: 'var(--warn)' },
-  { key: 'breakthrough', name: 'Breakthrough', tag: '(Growth)', sub: 'Biggest Personal Progress', prize: '$10', color: 'var(--danger)' }
+  { key: 'breakthrough', name: 'Breakthrough', tag: '(Growth)', sub: 'Biggest Personal Progress', prize: '$10', color: 'var(--danger)' },
+  { key: 'teamImpact', name: 'Team Impact', tag: '(Impact)', sub: 'Helping, Building, Coding, Leading', prize: '~$160', color: '#a78bfa' }
 ];
 const AWARD_BY_KEY = Object.fromEntries(AWARD_CATEGORIES.map(a => [a.key, a]));
 function awCatLabel(cat) { return cat ? `${cat.name} ${cat.tag}` : ''; }
