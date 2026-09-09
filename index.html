@@ -128,6 +128,12 @@
   .lb-points.neg{color:var(--danger);}
   .lb-points.zero{color:var(--muted);}
   .quick-points{display:flex;gap:6px;margin-top:6px;}
+  .cbg-header{display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px;}
+  .cbg-header label{margin:0;}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;}
+  .cb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+  .cb-item{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;}
+  .cb-item input{width:auto;margin:0;}
   .pie-flex{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
   .legend{display:flex;flex-direction:column;gap:6px;font-size:13px;}
   .legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px;}
@@ -655,37 +661,44 @@ Turkey"></textarea>
 
   <div class="card">
     <h2 id="awFormTitle">Log Points</h2>
-    <form id="awForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div>
-        <label for="awName">Student</label>
-        <input list="nameList" id="awName" required placeholder="e.g. Caden">
+    <form id="awForm">
+      <div class="cbg-header">
+        <label>Students</label>
+        <button type="button" class="link-btn" id="awToggleStudents">Select all / none</button>
       </div>
-      <div>
-        <label for="awCategory">Award</label>
-        <select id="awCategory" required></select>
+      <div class="cb-grid" id="awStudentCheckboxes"></div>
+
+      <div class="cbg-header">
+        <label>Awards</label>
+        <button type="button" class="link-btn" id="awToggleCats">Select all / none</button>
       </div>
-      <div>
-        <label for="awPoints">Points (+ or −)</label>
-        <input type="number" id="awPoints" step="1" required placeholder="e.g. 2 or -1">
-        <div class="quick-points" id="quickPointsRow">
-          <button type="button" class="btn btn-secondary btn-sm" data-delta="-5">−5</button>
-          <button type="button" class="btn btn-secondary btn-sm" data-delta="-1">−1</button>
-          <button type="button" class="btn btn-secondary btn-sm" data-delta="1">+1</button>
-          <button type="button" class="btn btn-secondary btn-sm" data-delta="5">+5</button>
+      <div class="cb-grid" id="awCategoryCheckboxes"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
+        <div>
+          <label for="awPoints">Points (+ or −)</label>
+          <input type="number" id="awPoints" step="1" required placeholder="e.g. 2 or -1">
+          <div class="quick-points" id="quickPointsRow">
+            <button type="button" class="btn btn-secondary btn-sm" data-delta="-5">−5</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-delta="-1">−1</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-delta="1">+1</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-delta="5">+5</button>
+          </div>
+        </div>
+        <div>
+          <label for="awDate">Date</label>
+          <input type="date" id="awDate" required>
         </div>
       </div>
-      <div>
-        <label for="awDate">Date</label>
-        <input type="date" id="awDate" required>
-      </div>
-      <div class="full" style="grid-column:1/-1;">
+      <div style="margin-top:10px;">
         <label for="awReason">Reason (optional)</label>
         <textarea id="awReason" placeholder="e.g. finished all tasks early, missed two check-ins this week…"></textarea>
       </div>
-      <div class="full" style="grid-column:1/-1;">
+      <div style="margin-top:10px;">
         <button type="submit" class="btn btn-primary" id="awSubmitBtn">Log Points</button>
         <button type="button" class="btn btn-secondary" id="awCancelEditBtn" style="display:none;">Cancel Edit</button>
       </div>
+      <p class="hint">Check one or more students and one or more awards to log the same points to every combination at once. Editing an existing entry needs exactly one of each.</p>
     </form>
   </div>
 
@@ -700,7 +713,7 @@ Turkey"></textarea>
     </div>
     <div class="toolbar">
       <div class="filters">
-        <select id="awFilterCategory"><option value="">All awards</option></select>
+        <select id="awFilterCategory"><option value="">All categories</option></select>
         <input type="text" id="awFilterSearch" placeholder="Filter student…">
       </div>
     </div>
@@ -710,7 +723,7 @@ Turkey"></textarea>
           <tr>
             <th data-asort="date">Date</th>
             <th data-asort="name">Student</th>
-            <th data-asort="category">Award</th>
+            <th data-asort="category">Category</th>
             <th data-asort="points">Points</th>
             <th>Reason</th>
             <th></th>

@@ -1811,18 +1811,19 @@ window.shDeleteEntry = shDeleteEntry;
 
 // ---------- Awards (student point / leaderboard tracker) ----------
 const AWARD_CATEGORIES = [
-  { key: 'homework', name: 'Mission Control Award', sub: 'Weekly Homework', prize: '$10', color: 'var(--accent)' },
-  { key: 'class', name: 'Laser Focus Award', sub: 'Staying Focused in Class', prize: '$10', color: 'var(--accent2)' },
-  { key: 'chat', name: 'Signal Check Award', sub: 'Checking Team Chat Daily', prize: '$10', color: 'var(--warn)' },
-  { key: 'breakthrough', name: 'Breakthrough Award', sub: 'Biggest Personal Progress', prize: '$10', color: 'var(--danger)' }
+  { key: 'homework', name: 'Mission Control', tag: '(HW)', sub: 'Weekly Homework', prize: '$10', color: 'var(--accent)' },
+  { key: 'class', name: 'Laser Focus', tag: '(Class)', sub: 'Staying Focused in Class', prize: '$10', color: 'var(--accent2)' },
+  { key: 'chat', name: 'Signal Check', tag: '(Chat)', sub: 'Checking Team Chat Daily', prize: '$10', color: 'var(--warn)' },
+  { key: 'breakthrough', name: 'Breakthrough', tag: '(Growth)', sub: 'Biggest Personal Progress', prize: '$10', color: 'var(--danger)' }
 ];
 const AWARD_BY_KEY = Object.fromEntries(AWARD_CATEGORIES.map(a => [a.key, a]));
+function awCatLabel(cat) { return cat ? `${cat.name} ${cat.tag}` : ''; }
 
 const awardGrid = document.getElementById('awardGrid');
 const awForm = document.getElementById('awForm');
 const awFormTitle = document.getElementById('awFormTitle');
-const awName = document.getElementById('awName');
-const awCategory = document.getElementById('awCategory');
+const awStudentCheckboxes = document.getElementById('awStudentCheckboxes');
+const awCategoryCheckboxes = document.getElementById('awCategoryCheckboxes');
 const awPoints = document.getElementById('awPoints');
 const awDate = document.getElementById('awDate');
 const awReason = document.getElementById('awReason');
@@ -1838,8 +1839,34 @@ let awEditingId = null;
 let awSortKey = 'createdAt';
 let awSortDir = 'desc';
 
-awCategory.innerHTML = AWARD_CATEGORIES.map(a => `<option value="${a.key}">${escapeHtml(a.name)}</option>`).join('');
 awDate.value = localDateStr();
+
+// Category checkboxes never change at runtime, so build them once.
+awCategoryCheckboxes.innerHTML = AWARD_CATEGORIES.map(c => `
+  <label class="cb-item"><input type="checkbox" value="${c.key}"> ${escapeHtml(awCatLabel(c))}</label>
+`).join('');
+
+// Student checkboxes depend on the live roster, so they're rebuilt on every
+// data refresh — but we preserve whatever's currently checked so an
+// in-progress selection doesn't get wiped out by an unrelated sync.
+function rebuildStudentCheckboxes() {
+  const allNames = [...new Set([...roster, ...entries.map(e => e.name), ...awardPoints.map(e => e.name)])]
+    .filter(Boolean).sort();
+  const prevChecked = new Set([...awStudentCheckboxes.querySelectorAll('input:checked')].map(cb => cb.value));
+  awStudentCheckboxes.innerHTML = allNames.map(n => `
+    <label class="cb-item"><input type="checkbox" value="${escapeHtml(n)}" ${prevChecked.has(n) ? 'checked' : ''}> ${escapeHtml(n)}</label>
+  `).join('') || '<span class="hint" style="margin:0;">No students yet — add roster names on the Entry tab.</span>';
+}
+
+function wireSelectAllToggle(btnId, container) {
+  document.getElementById(btnId).addEventListener('click', () => {
+    const boxes = [...container.querySelectorAll('input[type=checkbox]')];
+    const allChecked = boxes.length > 0 && boxes.every(cb => cb.checked);
+    boxes.forEach(cb => { cb.checked = !allChecked; });
+  });
+}
+wireSelectAllToggle('awToggleStudents', awStudentCheckboxes);
+wireSelectAllToggle('awToggleCats', awCategoryCheckboxes);
 
 document.getElementById('quickPointsRow').addEventListener('click', (ev) => {
   const btn = ev.target.closest('button[data-delta]');
@@ -1850,35 +1877,59 @@ document.getElementById('quickPointsRow').addEventListener('click', (ev) => {
 
 awForm.addEventListener('submit', (ev) => {
   ev.preventDefault();
-  const entry = {
-    name: awName.value.trim(),
-    category: awCategory.value,
-    points: parseFloat(awPoints.value),
-    date: awDate.value,
-    reason: awReason.value.trim()
-  };
-  if (!entry.name || isNaN(entry.points) || !entry.date) { toast('Student, points, and date are required'); return; }
+  const selectedStudents = [...awStudentCheckboxes.querySelectorAll('input:checked')].map(cb => cb.value);
+  const selectedCats = [...awCategoryCheckboxes.querySelectorAll('input:checked')].map(cb => cb.value);
+  const points = parseFloat(awPoints.value);
+  const date = awDate.value;
+  const reason = awReason.value.trim();
 
-  let savePromise;
+  if (!selectedStudents.length || !selectedCats.length) { toast('Check at least one student and one award'); return; }
+  if (isNaN(points) || !date) { toast('Points and date are required'); return; }
+
   if (awEditingId) {
+    if (selectedStudents.length !== 1 || selectedCats.length !== 1) {
+      toast('Editing needs exactly one student and one award checked');
+      return;
+    }
     const existing = awardPoints.find(x => x.id === awEditingId);
-    entry.createdAt = (existing && existing.createdAt) || new Date().toISOString();
-    savePromise = db.collection('awardPoints').doc(awEditingId).set(entry);
-  } else {
-    entry.createdAt = new Date().toISOString();
-    savePromise = db.collection('awardPoints').add(entry);
+    const entry = {
+      name: selectedStudents[0],
+      category: selectedCats[0],
+      points, date, reason,
+      createdAt: (existing && existing.createdAt) || new Date().toISOString()
+    };
+    db.collection('awardPoints').doc(awEditingId).set(entry)
+      .then(() => { toast('Points updated'); awResetForm(); })
+      .catch(err => toast('Error: ' + err.message));
+    return;
   }
 
-  savePromise
-    .then(() => { toast(awEditingId ? 'Points updated' : 'Points logged'); awResetForm(); })
+  // one entry per student × award combo, timestamped a beat apart so a
+  // multi-select batch still sorts in a stable, deterministic order
+  const batch = db.batch();
+  const batchBase = Date.now();
+  let i = 0;
+  selectedStudents.forEach(name => {
+    selectedCats.forEach(category => {
+      batch.set(db.collection('awardPoints').doc(), {
+        name, category, points, date, reason,
+        createdAt: new Date(batchBase + i).toISOString()
+      });
+      i++;
+    });
+  });
+  batch.commit()
+    .then(() => { toast(`Logged ${i} point ${i === 1 ? 'entry' : 'entries'}`); awResetForm(); })
     .catch(err => toast('Error: ' + err.message));
 });
 
 function awResetForm() {
   awEditingId = null;
-  awForm.reset();
+  awStudentCheckboxes.querySelectorAll('input').forEach(cb => { cb.checked = false; });
+  awCategoryCheckboxes.querySelectorAll('input').forEach(cb => { cb.checked = false; });
+  awPoints.value = '';
   awDate.value = localDateStr();
-  awCategory.value = AWARD_CATEGORIES[0].key;
+  awReason.value = '';
   awSubmitBtn.textContent = 'Log Points';
   awCancelEditBtn.style.display = 'none';
   awFormTitle.textContent = 'Log Points';
@@ -1889,8 +1940,8 @@ function awStartEdit(id) {
   const e = awardPoints.find(x => x.id === id);
   if (!e) return;
   awEditingId = id;
-  awName.value = e.name || '';
-  awCategory.value = e.category || AWARD_CATEGORIES[0].key;
+  awStudentCheckboxes.querySelectorAll('input').forEach(cb => { cb.checked = (cb.value === e.name); });
+  awCategoryCheckboxes.querySelectorAll('input').forEach(cb => { cb.checked = (cb.value === e.category); });
   awPoints.value = e.points;
   awDate.value = e.date || '';
   awReason.value = e.reason || '';
@@ -1932,10 +1983,9 @@ document.querySelectorAll('th[data-asort]').forEach(th => {
 function awNorm(s) { return (s || '').trim().toLowerCase(); }
 
 function renderAwardLeaderboards() {
-  // every student who has ever logged an hours entry, plus the current roster,
-  // so someone sitting at 0 in a category still shows up on the board
   const allNames = [...new Set([...roster, ...entries.map(e => e.name), ...awardPoints.map(e => e.name)])]
     .filter(Boolean).sort();
+  const medals = ['🥇', '🥈', '🥉'];
 
   const cards = AWARD_CATEGORIES.map(cat => {
     const totals = {};
@@ -1944,7 +1994,6 @@ function renderAwardLeaderboards() {
       totals[e.name] = (totals[e.name] || 0) + Number(e.points || 0);
     });
     const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-    const medals = ['🥇', '🥈', '🥉'];
     const rows = ranked.map(([name, pts], i) => {
       const cls = pts > 0 ? 'pos' : (pts < 0 ? 'neg' : 'zero');
       const rank = medals[i] || (i + 1);
@@ -1952,39 +2001,22 @@ function renderAwardLeaderboards() {
     }).join('') || '<div class="empty" style="padding:6px 0;">No students yet</div>';
     return `
       <div class="award-card" style="border-top-color:${cat.color};">
-        <h3>${cat.name}</h3>
+        <h3>${awCatLabel(cat)}</h3>
         <p class="award-sub">${escapeHtml(cat.sub)} · ${cat.prize} prize</p>
         ${rows}
       </div>`;
   });
 
-  // bonus: combined standing across all four awards, for a season-overview
-  const combinedTotals = {};
-  allNames.forEach(n => { combinedTotals[n] = 0; });
-  awardPoints.forEach(e => { combinedTotals[e.name] = (combinedTotals[e.name] || 0) + Number(e.points || 0); });
-  const combinedRanked = Object.entries(combinedTotals).sort((a, b) => b[1] - a[1]);
-  const medals = ['🥇', '🥈', '🥉'];
-  const combinedRows = combinedRanked.map(([name, pts], i) => {
-    const cls = pts > 0 ? 'pos' : (pts < 0 ? 'neg' : 'zero');
-    const rank = medals[i] || (i + 1);
-    return `<div class="lb-row"><span class="lb-rank">${rank}</span><span class="lb-name">${escapeHtml(name)}</span><span class="lb-points ${cls}">${pts > 0 ? '+' : ''}${pts}</span></div>`;
-  }).join('') || '<div class="empty" style="padding:6px 0;">No students yet</div>';
-  cards.push(`
-    <div class="award-card" style="border-top-color:var(--muted);">
-      <h3>Combined Standing</h3>
-      <p class="award-sub">All four awards added together</p>
-      ${combinedRows}
-    </div>`);
-
   awardGrid.innerHTML = cards.join('');
 }
 
 function renderAwards() {
+  rebuildStudentCheckboxes();
   renderAwardLeaderboards();
 
   const prevCat = awFilterCategory.value;
-  awFilterCategory.innerHTML = '<option value="">All awards</option>' +
-    AWARD_CATEGORIES.map(a => `<option value="${a.key}">${escapeHtml(a.name)}</option>`).join('');
+  awFilterCategory.innerHTML = '<option value="">All categories</option>' +
+    AWARD_CATEGORIES.map(a => `<option value="${a.key}">${escapeHtml(awCatLabel(a))}</option>`).join('');
   awFilterCategory.value = prevCat;
 
   let rows = [...awardPoints];
@@ -2009,7 +2041,7 @@ function renderAwards() {
     <tr>
       <td>${fmtDate(e.date)}</td>
       <td>${escapeHtml(e.name || '')}</td>
-      <td><span class="pill">${escapeHtml(cat ? cat.name : e.category || '—')}</span></td>
+      <td><span class="pill">${escapeHtml(cat ? awCatLabel(cat) : e.category || '—')}</span></td>
       <td class="lb-points ${cls}">${e.points > 0 ? '+' : ''}${e.points}</td>
       <td>${escapeHtml(e.reason || '')}</td>
       <td class="row-actions">
@@ -2030,7 +2062,7 @@ function getAwardExportRows() {
   return rows.map(e => ({
     Date: fmtDate(e.date),
     Student: e.name || '',
-    Award: (AWARD_BY_KEY[e.category] || {}).name || e.category || '',
+    Category: awCatLabel(AWARD_BY_KEY[e.category]) || e.category || '',
     Points: e.points,
     Reason: e.reason || ''
   }));
@@ -2041,7 +2073,7 @@ document.getElementById('awExportXlsxBtn').addEventListener('click', () => {
   const rows = getAwardExportRows();
   if (!rows.length) { toast('Nothing to export'); return; }
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{ wch: 11 }, { wch: 16 }, { wch: 22 }, { wch: 8 }, { wch: 34 }];
+  ws['!cols'] = [{ wch: 11 }, { wch: 16 }, { wch: 18 }, { wch: 8 }, { wch: 34 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Award Points');
   const stamp = new Date().toISOString().slice(0, 10);
