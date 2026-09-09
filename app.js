@@ -298,6 +298,7 @@ statusEl.textContent = 'Connecting…';
 db.collection('entries').onSnapshot(snapshot => {
   entries = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
   render();
+  if (typeof renderAwards === 'function') renderAwards();
 }, err => toast('Sync error: ' + err.message));
 
 db.collection('meta').doc('roster').onSnapshot(doc => {
@@ -310,6 +311,7 @@ db.collection('meta').doc('roster').onSnapshot(doc => {
   }
   renderMatrix();
   render();
+  if (typeof renderAwards === 'function') renderAwards();
 }, err => toast('Sync error: ' + err.message));
 
 db.collection('volunteerEntries').onSnapshot(snapshot => {
@@ -1806,6 +1808,268 @@ document.getElementById('shExportCsvBtn').addEventListener('click', () => {
 
 window.shStartEdit = shStartEdit;
 window.shDeleteEntry = shDeleteEntry;
+
+// ---------- Awards (student point / leaderboard tracker) ----------
+const AWARD_CATEGORIES = [
+  { key: 'homework', name: 'Mission Control Award', sub: 'Weekly Homework', prize: '$10', color: 'var(--accent)' },
+  { key: 'class', name: 'Laser Focus Award', sub: 'Staying Focused in Class', prize: '$10', color: 'var(--accent2)' },
+  { key: 'chat', name: 'Signal Check Award', sub: 'Checking Team Chat Daily', prize: '$10', color: 'var(--warn)' },
+  { key: 'breakthrough', name: 'Breakthrough Award', sub: 'Biggest Personal Progress', prize: '$10', color: 'var(--danger)' }
+];
+const AWARD_BY_KEY = Object.fromEntries(AWARD_CATEGORIES.map(a => [a.key, a]));
+
+const awardGrid = document.getElementById('awardGrid');
+const awForm = document.getElementById('awForm');
+const awFormTitle = document.getElementById('awFormTitle');
+const awName = document.getElementById('awName');
+const awCategory = document.getElementById('awCategory');
+const awPoints = document.getElementById('awPoints');
+const awDate = document.getElementById('awDate');
+const awReason = document.getElementById('awReason');
+const awSubmitBtn = document.getElementById('awSubmitBtn');
+const awCancelEditBtn = document.getElementById('awCancelEditBtn');
+const awEntriesBody = document.getElementById('awEntriesBody');
+const awEmptyMsg = document.getElementById('awEmptyMsg');
+const awFilterCategory = document.getElementById('awFilterCategory');
+const awFilterSearch = document.getElementById('awFilterSearch');
+
+let awardPoints = [];
+let awEditingId = null;
+let awSortKey = 'createdAt';
+let awSortDir = 'desc';
+
+awCategory.innerHTML = AWARD_CATEGORIES.map(a => `<option value="${a.key}">${escapeHtml(a.name)}</option>`).join('');
+awDate.value = localDateStr();
+
+document.getElementById('quickPointsRow').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-delta]');
+  if (!btn) return;
+  const current = parseFloat(awPoints.value) || 0;
+  awPoints.value = current + parseInt(btn.dataset.delta, 10);
+});
+
+awForm.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const entry = {
+    name: awName.value.trim(),
+    category: awCategory.value,
+    points: parseFloat(awPoints.value),
+    date: awDate.value,
+    reason: awReason.value.trim()
+  };
+  if (!entry.name || isNaN(entry.points) || !entry.date) { toast('Student, points, and date are required'); return; }
+
+  let savePromise;
+  if (awEditingId) {
+    const existing = awardPoints.find(x => x.id === awEditingId);
+    entry.createdAt = (existing && existing.createdAt) || new Date().toISOString();
+    savePromise = db.collection('awardPoints').doc(awEditingId).set(entry);
+  } else {
+    entry.createdAt = new Date().toISOString();
+    savePromise = db.collection('awardPoints').add(entry);
+  }
+
+  savePromise
+    .then(() => { toast(awEditingId ? 'Points updated' : 'Points logged'); awResetForm(); })
+    .catch(err => toast('Error: ' + err.message));
+});
+
+function awResetForm() {
+  awEditingId = null;
+  awForm.reset();
+  awDate.value = localDateStr();
+  awCategory.value = AWARD_CATEGORIES[0].key;
+  awSubmitBtn.textContent = 'Log Points';
+  awCancelEditBtn.style.display = 'none';
+  awFormTitle.textContent = 'Log Points';
+}
+awCancelEditBtn.addEventListener('click', awResetForm);
+
+function awStartEdit(id) {
+  const e = awardPoints.find(x => x.id === id);
+  if (!e) return;
+  awEditingId = id;
+  awName.value = e.name || '';
+  awCategory.value = e.category || AWARD_CATEGORIES[0].key;
+  awPoints.value = e.points;
+  awDate.value = e.date || '';
+  awReason.value = e.reason || '';
+  awSubmitBtn.textContent = 'Save Changes';
+  awCancelEditBtn.style.display = 'inline-block';
+  awFormTitle.textContent = 'Editing Points';
+  awFormTitle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function awDeleteEntry(id) {
+  if (!confirm('Delete this point entry?')) return;
+  db.collection('awardPoints').doc(id).delete()
+    .then(() => toast('Entry deleted'))
+    .catch(err => toast('Error: ' + err.message));
+}
+
+document.getElementById('awClearAllBtn').addEventListener('click', () => {
+  if (!requireAdminPasscode('delete ALL award points')) return;
+  if (!confirm('Delete ALL award point entries? This cannot be undone.')) return;
+  db.collection('awardPoints').get().then(snapshot => {
+    const batch = db.batch();
+    snapshot.docs.forEach(d => batch.delete(d.ref));
+    return batch.commit();
+  })
+    .then(() => toast('All award points cleared'))
+    .catch(err => toast('Error: ' + err.message));
+});
+
+[awFilterCategory, awFilterSearch].forEach(el => el.addEventListener('input', renderAwards));
+document.querySelectorAll('th[data-asort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.asort;
+    if (awSortKey === key) awSortDir = awSortDir === 'asc' ? 'desc' : 'asc';
+    else { awSortKey = key; awSortDir = 'asc'; }
+    renderAwards();
+  });
+});
+
+function awNorm(s) { return (s || '').trim().toLowerCase(); }
+
+function renderAwardLeaderboards() {
+  // every student who has ever logged an hours entry, plus the current roster,
+  // so someone sitting at 0 in a category still shows up on the board
+  const allNames = [...new Set([...roster, ...entries.map(e => e.name), ...awardPoints.map(e => e.name)])]
+    .filter(Boolean).sort();
+
+  const cards = AWARD_CATEGORIES.map(cat => {
+    const totals = {};
+    allNames.forEach(n => { totals[n] = 0; });
+    awardPoints.filter(e => e.category === cat.key).forEach(e => {
+      totals[e.name] = (totals[e.name] || 0) + Number(e.points || 0);
+    });
+    const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    const medals = ['🥇', '🥈', '🥉'];
+    const rows = ranked.map(([name, pts], i) => {
+      const cls = pts > 0 ? 'pos' : (pts < 0 ? 'neg' : 'zero');
+      const rank = medals[i] || (i + 1);
+      return `<div class="lb-row"><span class="lb-rank">${rank}</span><span class="lb-name">${escapeHtml(name)}</span><span class="lb-points ${cls}">${pts > 0 ? '+' : ''}${pts}</span></div>`;
+    }).join('') || '<div class="empty" style="padding:6px 0;">No students yet</div>';
+    return `
+      <div class="award-card" style="border-top-color:${cat.color};">
+        <h3>${cat.name}</h3>
+        <p class="award-sub">${escapeHtml(cat.sub)} · ${cat.prize} prize</p>
+        ${rows}
+      </div>`;
+  });
+
+  // bonus: combined standing across all four awards, for a season-overview
+  const combinedTotals = {};
+  allNames.forEach(n => { combinedTotals[n] = 0; });
+  awardPoints.forEach(e => { combinedTotals[e.name] = (combinedTotals[e.name] || 0) + Number(e.points || 0); });
+  const combinedRanked = Object.entries(combinedTotals).sort((a, b) => b[1] - a[1]);
+  const medals = ['🥇', '🥈', '🥉'];
+  const combinedRows = combinedRanked.map(([name, pts], i) => {
+    const cls = pts > 0 ? 'pos' : (pts < 0 ? 'neg' : 'zero');
+    const rank = medals[i] || (i + 1);
+    return `<div class="lb-row"><span class="lb-rank">${rank}</span><span class="lb-name">${escapeHtml(name)}</span><span class="lb-points ${cls}">${pts > 0 ? '+' : ''}${pts}</span></div>`;
+  }).join('') || '<div class="empty" style="padding:6px 0;">No students yet</div>';
+  cards.push(`
+    <div class="award-card" style="border-top-color:var(--muted);">
+      <h3>Combined Standing</h3>
+      <p class="award-sub">All four awards added together</p>
+      ${combinedRows}
+    </div>`);
+
+  awardGrid.innerHTML = cards.join('');
+}
+
+function renderAwards() {
+  renderAwardLeaderboards();
+
+  const prevCat = awFilterCategory.value;
+  awFilterCategory.innerHTML = '<option value="">All awards</option>' +
+    AWARD_CATEGORIES.map(a => `<option value="${a.key}">${escapeHtml(a.name)}</option>`).join('');
+  awFilterCategory.value = prevCat;
+
+  let rows = [...awardPoints];
+  if (awFilterCategory.value) rows = rows.filter(e => e.category === awFilterCategory.value);
+  const search = awNorm(awFilterSearch.value);
+  if (search) rows = rows.filter(e => awNorm(e.name).includes(search));
+
+  rows.sort((a, b) => {
+    let av = a[awSortKey], bv = b[awSortKey];
+    if (awSortKey === 'points') { av = Number(av); bv = Number(bv); }
+    else { av = (av ?? '').toString(); bv = (bv ?? '').toString(); }
+    if (av < bv) return awSortDir === 'asc' ? -1 : 1;
+    if (av > bv) return awSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  awEmptyMsg.style.display = rows.length ? 'none' : 'block';
+  awEntriesBody.innerHTML = rows.map(e => {
+    const cat = AWARD_BY_KEY[e.category];
+    const cls = e.points > 0 ? 'pos' : (e.points < 0 ? 'neg' : 'zero');
+    return `
+    <tr>
+      <td>${fmtDate(e.date)}</td>
+      <td>${escapeHtml(e.name || '')}</td>
+      <td><span class="pill">${escapeHtml(cat ? cat.name : e.category || '—')}</span></td>
+      <td class="lb-points ${cls}">${e.points > 0 ? '+' : ''}${e.points}</td>
+      <td>${escapeHtml(e.reason || '')}</td>
+      <td class="row-actions">
+        <button class="btn btn-secondary btn-sm" onclick="awStartEdit('${e.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="awDeleteEntry('${e.id}')">Del</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+db.collection('awardPoints').onSnapshot(snapshot => {
+  awardPoints = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderAwards();
+}, err => toast('Sync error: ' + err.message));
+
+function getAwardExportRows() {
+  const rows = [...awardPoints].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  return rows.map(e => ({
+    Date: fmtDate(e.date),
+    Student: e.name || '',
+    Award: (AWARD_BY_KEY[e.category] || {}).name || e.category || '',
+    Points: e.points,
+    Reason: e.reason || ''
+  }));
+}
+
+document.getElementById('awExportXlsxBtn').addEventListener('click', () => {
+  if (typeof XLSX === 'undefined') { toast('Export library not loaded — check connection'); return; }
+  const rows = getAwardExportRows();
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 11 }, { wch: 16 }, { wch: 22 }, { wch: 8 }, { wch: 34 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Award Points');
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `fll-award-points-${stamp}.xlsx`);
+  toast('Exported .xlsx');
+});
+
+document.getElementById('awExportCsvBtn').addEventListener('click', () => {
+  const rows = getAwardExportRows();
+  if (!rows.length) { toast('Nothing to export'); return; }
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.join(','),
+    ...rows.map(r => headers.map(h => `"${String(r[h]).replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `fll-award-points-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Exported .csv');
+});
+
+window.awStartEdit = awStartEdit;
+window.awDeleteEntry = awDeleteEntry;
 
 // ---------- Service worker ----------
 // Beyond just registering, this actively checks for a newer sw.js/app version

@@ -115,6 +115,19 @@
   .timer-display{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);}
   .timer-box.running .timer-display{color:var(--accent2);font-weight:600;}
   .timer-box.running #timerToggleBtn{border-color:var(--danger);color:var(--danger);}
+  .award-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:6px;}
+  .award-card{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px;border-top:3px solid var(--accent-color,var(--accent));}
+  .award-card h3{margin:0 0 2px;font-size:14px;}
+  .award-card .award-sub{font-size:11px;color:var(--muted);margin:0 0 10px;}
+  .lb-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .lb-row:last-child{border-bottom:none;}
+  .lb-rank{width:22px;flex-shrink:0;color:var(--muted);font-size:12px;text-align:center;}
+  .lb-name{flex:1;}
+  .lb-points{font-weight:700;font-variant-numeric:tabular-nums;}
+  .lb-points.pos{color:var(--accent2);}
+  .lb-points.neg{color:var(--danger);}
+  .lb-points.zero{color:var(--muted);}
+  .quick-points{display:flex;gap:6px;margin-top:6px;}
   .pie-flex{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
   .legend{display:flex;flex-direction:column;gap:6px;font-size:13px;}
   .legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px;}
@@ -149,6 +162,7 @@
   <div class="maintab active" data-maintab="summary">📊 Summary</div>
   <div class="maintab" data-maintab="entry">📝 Entry</div>
   <div class="maintab" data-maintab="volunteers">🙋 Volunteers</div>
+  <div class="maintab" data-maintab="awards">🏆 Awards</div>
   <div class="maintab" data-maintab="sharing">🤝 Sharing</div>
 </nav>
 
@@ -627,6 +641,85 @@ Turkey"></textarea>
       </table>
     </div>
     <div class="empty" id="shEmptyMsg" style="display:none;">No shares logged yet — paste an order above to add the first one.</div>
+  </div>
+
+</div>
+
+<!-- ============ AWARDS PANEL ============ -->
+<div class="mainpanel" id="panel-awards">
+
+  <div class="card">
+    <h2>Leaderboards</h2>
+    <div class="award-grid" id="awardGrid"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="awFormTitle">Log Points</h2>
+    <form id="awForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <label for="awName">Student</label>
+        <input list="nameList" id="awName" required placeholder="e.g. Caden">
+      </div>
+      <div>
+        <label for="awCategory">Award</label>
+        <select id="awCategory" required></select>
+      </div>
+      <div>
+        <label for="awPoints">Points (+ or −)</label>
+        <input type="number" id="awPoints" step="1" required placeholder="e.g. 2 or -1">
+        <div class="quick-points" id="quickPointsRow">
+          <button type="button" class="btn btn-secondary btn-sm" data-delta="-5">−5</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-delta="-1">−1</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-delta="1">+1</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-delta="5">+5</button>
+        </div>
+      </div>
+      <div>
+        <label for="awDate">Date</label>
+        <input type="date" id="awDate" required>
+      </div>
+      <div class="full" style="grid-column:1/-1;">
+        <label for="awReason">Reason (optional)</label>
+        <textarea id="awReason" placeholder="e.g. finished all tasks early, missed two check-ins this week…"></textarea>
+      </div>
+      <div class="full" style="grid-column:1/-1;">
+        <button type="submit" class="btn btn-primary" id="awSubmitBtn">Log Points</button>
+        <button type="button" class="btn btn-secondary" id="awCancelEditBtn" style="display:none;">Cancel Edit</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Point Log</h2>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="awExportXlsxBtn">Export .xlsx</button>
+        <button class="btn btn-secondary btn-sm" id="awExportCsvBtn">Export .csv</button>
+        <button class="danger-link" id="awClearAllBtn" style="display:inline;padding:7px 12px;">Clear all (admin)</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="filters">
+        <select id="awFilterCategory"><option value="">All awards</option></select>
+        <input type="text" id="awFilterSearch" placeholder="Filter student…">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="entries">
+        <thead>
+          <tr>
+            <th data-asort="date">Date</th>
+            <th data-asort="name">Student</th>
+            <th data-asort="category">Award</th>
+            <th data-asort="points">Points</th>
+            <th>Reason</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="awEntriesBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="awEmptyMsg" style="display:none;">No points logged yet — add the first one above.</div>
   </div>
 
 </div>
