@@ -1987,25 +1987,34 @@ function renderAwardLeaderboards() {
     .filter(Boolean).sort();
   const medals = ['🥇', '🥈', '🥉'];
 
-  const cards = AWARD_CATEGORIES.map(cat => {
+  function leaderboardRows(pointsList) {
     const totals = {};
     allNames.forEach(n => { totals[n] = 0; });
-    awardPoints.filter(e => e.category === cat.key).forEach(e => {
+    pointsList.forEach(e => {
       totals[e.name] = (totals[e.name] || 0) + Number(e.points || 0);
     });
     const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-    const rows = ranked.map(([name, pts], i) => {
+    return ranked.map(([name, pts], i) => {
       const cls = pts > 0 ? 'pos' : (pts < 0 ? 'neg' : 'zero');
       const rank = medals[i] || (i + 1);
       return `<div class="lb-row"><span class="lb-rank">${rank}</span><span class="lb-name">${escapeHtml(name)}</span><span class="lb-points ${cls}">${pts > 0 ? '+' : ''}${pts}</span></div>`;
     }).join('') || '<div class="empty" style="padding:6px 0;">No students yet</div>';
-    return `
+  }
+
+  const cards = AWARD_CATEGORIES.map(cat => `
       <div class="award-card" style="border-top-color:${cat.color};">
         <h3>${awCatLabel(cat)}</h3>
         <p class="award-sub">${escapeHtml(cat.sub)} · ${cat.prize} prize</p>
-        ${rows}
-      </div>`;
-  });
+        ${leaderboardRows(awardPoints.filter(e => e.category === cat.key))}
+      </div>`);
+
+  // combined standing across all four awards, for a season-overview
+  cards.push(`
+      <div class="award-card" style="border-top-color:var(--muted);">
+        <h3>Combined Standing</h3>
+        <p class="award-sub">All four awards added together</p>
+        ${leaderboardRows(awardPoints)}
+      </div>`);
 
   awardGrid.innerHTML = cards.join('');
 }
