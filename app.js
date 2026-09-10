@@ -259,6 +259,11 @@ vCommitMatrixBtn.addEventListener('click', () => {
 
   if (!newEntries.length) { toast('No times entered'); return; }
 
+  // stamp each row a millisecond apart so ties within this batch still
+  // preserve a stable, deterministic order (newest at the bottom of the batch)
+  const batchBase = Date.now();
+  newEntries.forEach((e, i) => { e.createdAt = new Date(batchBase + i).toISOString(); });
+
   const batch = db.batch();
   newEntries.forEach(e => batch.set(db.collection('volunteerEntries').doc(), e));
   batch.commit()
@@ -512,6 +517,11 @@ function render() {
     if (sortKey === 'duration' || sortKey === 'week') { av = Number(av); bv = Number(bv); }
     if (av < bv) return sortDir === 'asc' ? -1 : 1;
     if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    // tie-break (mainly for older rows saved before createdAt existed):
+    // fall back to date, newest first, instead of leaving them in
+    // Firestore's arbitrary document order
+    const ad = a.date || '', bd = b.date || '';
+    if (ad !== bd) return ad < bd ? 1 : -1;
     return 0;
   });
 
@@ -1189,6 +1199,11 @@ function renderVolunteers() {
     if (vSortKey === 'hours') { av = Number(av); bv = Number(bv); }
     if (av < bv) return vSortDir === 'asc' ? -1 : 1;
     if (av > bv) return vSortDir === 'asc' ? 1 : -1;
+    // tie-break (mainly for older rows saved before createdAt existed):
+    // fall back to date, newest first, instead of leaving them in
+    // Firestore's arbitrary document order
+    const ad = a.date || '', bd = b.date || '';
+    if (ad !== bd) return ad < bd ? 1 : -1;
     return 0;
   });
 
@@ -1735,7 +1750,13 @@ function renderSharing() {
     const av = (a[shSortKey] ?? '').toString();
     const bv = (b[shSortKey] ?? '').toString();
     const cmp = av.localeCompare(bv, undefined, { numeric: true });
-    return shSortDir === 'asc' ? cmp : -cmp;
+    if (cmp !== 0) return shSortDir === 'asc' ? cmp : -cmp;
+    // tie-break (mainly for older rows saved before createdAt existed):
+    // fall back to date, newest first, instead of leaving them in
+    // Firestore's arbitrary document order
+    const ad = a.date || '', bd = b.date || '';
+    if (ad !== bd) return ad < bd ? 1 : -1;
+    return 0;
   });
 
   shEmptyMsg.style.display = rows.length ? 'none' : 'block';
@@ -2040,6 +2061,9 @@ function renderAwards() {
     else { av = (av ?? '').toString(); bv = (bv ?? '').toString(); }
     if (av < bv) return awSortDir === 'asc' ? -1 : 1;
     if (av > bv) return awSortDir === 'asc' ? 1 : -1;
+    // tie-break: fall back to date, newest first
+    const ad = a.date || '', bd = b.date || '';
+    if (ad !== bd) return ad < bd ? 1 : -1;
     return 0;
   });
 
