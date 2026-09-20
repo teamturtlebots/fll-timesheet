@@ -134,6 +134,8 @@
   .cb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
   .cb-item{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;}
   .cb-item input{width:auto;margin:0;}
+  tr.row-flag{background:rgba(245,185,61,.08);}
+  td.needs-review{color:var(--warn);}
   .pie-flex{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
   .legend{display:flex;flex-direction:column;gap:6px;font-size:13px;}
   .legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px;}
@@ -627,6 +629,9 @@ Turkey"></textarea>
       <div class="filters">
         <select id="shFilterCompetition"><option value="">All competitions</option></select>
         <input type="text" id="shFilterSearch" placeholder="Filter user/team/country…">
+        <label class="cb-item" style="white-space:nowrap;">
+          <input type="checkbox" id="shFilterNeedsReview"> ⚠️ Needs review (<span id="shNeedsReviewCount">0</span>)
+        </label>
       </div>
     </div>
     <div style="overflow-x:auto;">

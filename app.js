@@ -1553,6 +1553,8 @@ const shEntriesBody = document.getElementById('shEntriesBody');
 const shEmptyMsg = document.getElementById('shEmptyMsg');
 const shFilterCompetition = document.getElementById('shFilterCompetition');
 const shFilterSearch = document.getElementById('shFilterSearch');
+const shFilterNeedsReview = document.getElementById('shFilterNeedsReview');
+const shNeedsReviewCount = document.getElementById('shNeedsReviewCount');
 
 let sharingEntries = [];
 let shEditingId = null;
@@ -1702,7 +1704,7 @@ document.getElementById('shClearAllBtn').addEventListener('click', () => {
     .catch(err => toast('Error: ' + err.message));
 });
 
-[shFilterCompetition, shFilterSearch].forEach(el => el.addEventListener('input', renderSharing));
+[shFilterCompetition, shFilterSearch, shFilterNeedsReview].forEach(el => el.addEventListener('input', renderSharing));
 document.querySelectorAll('th[data-ssort]').forEach(th => {
   th.addEventListener('click', () => {
     const key = th.dataset.ssort;
@@ -1714,22 +1716,122 @@ document.querySelectorAll('th[data-ssort]').forEach(th => {
 
 function shNorm(s) { return (s || '').trim().toLowerCase(); }
 
+// Best-effort US-state detection from the freeform "City/Region/Country"
+// text customers type on the order form (e.g. "Rhode Island/USA",
+// "Marietta/GA/USA", "Texas", "TX"). Not foolproof on messy input, but a
+// solid approximation for a stats count.
+const US_STATE_LOOKUP = {
+  al: 'AL', alabama: 'AL', ak: 'AK', alaska: 'AK', az: 'AZ', arizona: 'AZ', ar: 'AR', arkansas: 'AR',
+  ca: 'CA', california: 'CA', co: 'CO', colorado: 'CO', ct: 'CT', connecticut: 'CT', de: 'DE', delaware: 'DE',
+  fl: 'FL', florida: 'FL', ga: 'GA', georgia: 'GA', hi: 'HI', hawaii: 'HI', id: 'ID', idaho: 'ID',
+  il: 'IL', illinois: 'IL', in: 'IN', indiana: 'IN', ia: 'IA', iowa: 'IA', ks: 'KS', kansas: 'KS',
+  ky: 'KY', kentucky: 'KY', la: 'LA', louisiana: 'LA', me: 'ME', maine: 'ME', md: 'MD', maryland: 'MD',
+  ma: 'MA', massachusetts: 'MA', mi: 'MI', michigan: 'MI', mn: 'MN', minnesota: 'MN', ms: 'MS', mississippi: 'MS',
+  mo: 'MO', missouri: 'MO', mt: 'MT', montana: 'MT', ne: 'NE', nebraska: 'NE', nv: 'NV', nevada: 'NV',
+  nh: 'NH', 'new hampshire': 'NH', nj: 'NJ', 'new jersey': 'NJ', nm: 'NM', 'new mexico': 'NM',
+  ny: 'NY', 'new york': 'NY', nc: 'NC', 'north carolina': 'NC', nd: 'ND', 'north dakota': 'ND',
+  oh: 'OH', ohio: 'OH', ok: 'OK', oklahoma: 'OK', or: 'OR', oregon: 'OR', pa: 'PA', pennsylvania: 'PA',
+  ri: 'RI', 'rhode island': 'RI', sc: 'SC', 'south carolina': 'SC', sd: 'SD', 'south dakota': 'SD',
+  tn: 'TN', tennessee: 'TN', tx: 'TX', texas: 'TX', ut: 'UT', utah: 'UT', vt: 'VT', vermont: 'VT',
+  va: 'VA', virginia: 'VA', wa: 'WA', washington: 'WA', wv: 'WV', 'west virginia': 'WV',
+  wi: 'WI', wisconsin: 'WI', wy: 'WY', wyoming: 'WY', dc: 'DC', 'washington dc': 'DC',
+  'washington d.c.': 'DC', 'district of columbia': 'DC'
+};
+const US_COUNTRY_ALIASES = new Set(['usa', 'us', 'u.s.', 'u.s.a.', 'united states', 'united states of america']);
+
+function detectUSState(location) {
+  const tokens = location.split(/[/,|;]+/).map(t => t.trim().toLowerCase().replace(/\.$/, '')).filter(Boolean);
+  if (!tokens.length) tokens.push(location.trim().toLowerCase());
+  for (const t of tokens) {
+    if (US_STATE_LOOKUP[t]) return US_STATE_LOOKUP[t];
+  }
+  return null;
+}
+
+// A broad-but-not-exhaustive list of country names, for flagging locations
+// we can't confidently classify. A few common aliases collapse into one
+// canonical bucket (e.g. England/Scotland/Wales/UK -> United Kingdom) so
+// the Countries stat doesn't fragment on how someone phrased it.
+const COUNTRY_ALIASES = {
+  uk: 'united kingdom', 'u.k.': 'united kingdom', 'great britain': 'united kingdom', britain: 'united kingdom',
+  england: 'united kingdom', scotland: 'united kingdom', wales: 'united kingdom', 'northern ireland': 'united kingdom',
+  uae: 'united arab emirates', 'south korea': 'korea, south', korea: 'korea, south', 'republic of korea': 'korea, south',
+  'north korea': 'korea, north', holland: 'netherlands', 'the netherlands': 'netherlands', 'czech republic': 'czechia'
+};
+const COUNTRY_SET = new Set([
+  'afghanistan', 'albania', 'algeria', 'andorra', 'angola', 'argentina', 'armenia', 'australia', 'austria',
+  'azerbaijan', 'bahamas', 'bahrain', 'bangladesh', 'barbados', 'belarus', 'belgium', 'belize', 'benin', 'bhutan',
+  'bolivia', 'bosnia and herzegovina', 'botswana', 'brazil', 'brunei', 'bulgaria', 'burkina faso', 'burundi',
+  'cambodia', 'cameroon', 'canada', 'chad', 'chile', 'china', 'colombia', 'costa rica', 'croatia', 'cuba',
+  'cyprus', 'czechia', 'denmark', 'djibouti', 'dominican republic', 'ecuador', 'egypt', 'el salvador', 'estonia',
+  'eswatini', 'ethiopia', 'fiji', 'finland', 'france', 'gabon', 'gambia', 'georgia', 'germany', 'ghana', 'greece',
+  'guatemala', 'guinea', 'guyana', 'haiti', 'honduras', 'hong kong', 'hungary', 'iceland', 'india', 'indonesia',
+  'iran', 'iraq', 'ireland', 'israel', 'italy', 'jamaica', 'japan', 'jordan', 'kazakhstan', 'kenya', 'kosovo',
+  'kuwait', 'kyrgyzstan', 'laos', 'latvia', 'lebanon', 'lesotho', 'liberia', 'libya', 'liechtenstein', 'lithuania',
+  'luxembourg', 'madagascar', 'malawi', 'malaysia', 'maldives', 'mali', 'malta', 'mauritania', 'mauritius',
+  'mexico', 'moldova', 'monaco', 'mongolia', 'montenegro', 'morocco', 'mozambique', 'myanmar', 'namibia', 'nepal',
+  'netherlands', 'new zealand', 'nicaragua', 'niger', 'nigeria', 'north macedonia', 'norway', 'oman', 'pakistan',
+  'panama', 'papua new guinea', 'paraguay', 'peru', 'philippines', 'poland', 'portugal', 'puerto rico', 'qatar',
+  'romania', 'russia', 'rwanda', 'saudi arabia', 'senegal', 'serbia', 'seychelles', 'singapore', 'slovakia',
+  'slovenia', 'somalia', 'south africa', 'korea, south', 'south sudan', 'spain', 'sri lanka', 'sudan', 'suriname',
+  'sweden', 'switzerland', 'syria', 'taiwan', 'tajikistan', 'tanzania', 'thailand', 'togo', 'trinidad and tobago',
+  'tunisia', 'turkey', 'turkmenistan', 'uganda', 'ukraine', 'united arab emirates', 'united kingdom', 'uruguay',
+  'uzbekistan', 'vatican city', 'venezuela', 'vietnam', 'yemen', 'zambia', 'zimbabwe'
+]);
+
+function detectCountry(location) {
+  const tokens = location.split(/[/,|;]+/).map(t => t.trim().toLowerCase().replace(/\.$/, '')).filter(Boolean);
+  const candidates = tokens.length ? [...tokens, location.trim().toLowerCase()] : [location.trim().toLowerCase()];
+  for (const c of candidates) {
+    if (US_COUNTRY_ALIASES.has(c)) return 'united states';
+    if (COUNTRY_ALIASES[c]) return COUNTRY_ALIASES[c];
+    if (COUNTRY_SET.has(c)) return c;
+  }
+  return null;
+}
+
+// Classifies a location string into a country bucket + optional US state.
+// confident=false means we couldn't match it to a known state or country —
+// that's the signal used to flag a row for manual review.
+function classifyLocation(location) {
+  if (!location) return { key: null, state: null, confident: false };
+  const state = detectUSState(location);
+  if (state) return { key: 'united states', state, confident: true };
+  const country = detectCountry(location);
+  if (country) return { key: country, state: null, confident: true };
+  return { key: shNorm(location), state: null, confident: false };
+}
+
+function shLocationNeedsReview(e) {
+  return !e.location || !classifyLocation(e.location).confident;
+}
+
 function renderSharingStats(rows) {
   const teamKey = e => shNorm(e.teamName) + '|' + shNorm(e.teamNumber);
   const uniqueTeams = new Set(rows.filter(e => e.teamName).map(teamKey)).size;
-  const uniqueLocations = new Set(rows.filter(e => e.location).map(e => shNorm(e.location))).size;
+
+  const countries = new Set();
+  const usStates = new Set();
+  rows.filter(e => e.location).forEach(e => {
+    const c = classifyLocation(e.location);
+    if (c.state) usStates.add(c.state);
+    if (c.key) countries.add(c.key);
+  });
+
   const uniqueCompetitions = new Set(rows.filter(e => e.competition).map(e => shNorm(e.competition))).size;
 
   shStatsGrid.innerHTML = `
     <div class="stat"><div class="val">${rows.length}</div><div class="lbl">Total shares</div></div>
     <div class="stat"><div class="val">${uniqueTeams}</div><div class="lbl">Teams helped</div></div>
-    <div class="stat"><div class="val">${uniqueLocations}</div><div class="lbl">Locations reached</div></div>
+    <div class="stat"><div class="val">${countries.size}</div><div class="lbl">Countries</div></div>
+    <div class="stat"><div class="val">${usStates.size}</div><div class="lbl">US States</div></div>
     <div class="stat"><div class="val">${uniqueCompetitions}</div><div class="lbl">Competitions</div></div>
   `;
 }
 
 function renderSharing() {
   renderSharingStats(sharingEntries);
+  shNeedsReviewCount.textContent = sharingEntries.filter(shLocationNeedsReview).length;
 
   // filter dropdown options
   const comps = [...new Set(sharingEntries.map(e => e.competition).filter(Boolean))].sort();
@@ -1745,6 +1847,7 @@ function renderSharing() {
     rows = rows.filter(e =>
       shNorm(e.user).includes(search) || shNorm(e.teamName).includes(search) || shNorm(e.location).includes(search));
   }
+  if (shFilterNeedsReview.checked) rows = rows.filter(shLocationNeedsReview);
 
   rows.sort((a, b) => {
     const av = (a[shSortKey] ?? '').toString();
@@ -1760,20 +1863,23 @@ function renderSharing() {
   });
 
   shEmptyMsg.style.display = rows.length ? 'none' : 'block';
-  shEntriesBody.innerHTML = rows.map(e => `
-    <tr>
+  shEntriesBody.innerHTML = rows.map(e => {
+    const flagged = shLocationNeedsReview(e);
+    return `
+    <tr class="${flagged ? 'row-flag' : ''}">
       <td>${fmtDate(e.date)}</td>
       <td>${escapeHtml(e.user || '')}</td>
       <td>${escapeHtml(e.teamName || '')}</td>
       <td>${escapeHtml(e.teamNumber || '')}</td>
-      <td>${escapeHtml(e.location || '')}</td>
+      <td class="${flagged ? 'needs-review' : ''}" ${flagged ? 'title="Couldn\'t confidently match a country or US state — check/fix this entry"' : ''}>${flagged ? '⚠️ ' : ''}${escapeHtml(e.location || '—')}</td>
       <td><span class="pill">${escapeHtml(e.competition || '—')}</span></td>
       <td>${escapeHtml(e.product || '')}</td>
       <td class="row-actions">
         <button class="btn btn-secondary btn-sm" onclick="shStartEdit('${e.id}')">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="shDeleteEntry('${e.id}')">Del</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 db.collection('sharingRecords').onSnapshot(snapshot => {
